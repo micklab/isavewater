@@ -44,7 +44,7 @@ namespace ISaveWater
                     var flow_rate = _flow.Rate();
                     if (flow_rate < ACTIVE_MIN_THRESHOLD)
                     {
-                        _alert_callback(String.Format("Area ({}): blockage detected {F1}", _id, flow_rate));
+                        _alert_callback("alert:" + _id + ":" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":blocked");
                     }
                 }
 
@@ -53,7 +53,7 @@ namespace ISaveWater
                     var flow_rate = _flow.Rate();
                     if (flow_rate > INACTIVE_MAX_THRESHOLD)
                     {
-                        _alert_callback(String.Format("Area ({}): leak detected {F1}", _id, flow_rate));
+                        _alert_callback("alert:" + _id + ":" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":leak");
                     }
                 }
 
@@ -80,6 +80,8 @@ namespace ISaveWater
         {
             Debug.WriteLine("Activating Area " + _id);
 
+            _state = ACTIVE_STATE;
+
             foreach (var zone in _zones)
             {
                 zone.Enable();
@@ -89,6 +91,8 @@ namespace ISaveWater
         public void Deactivate()
         {
             Debug.WriteLine("Deactivating Area " + _id);
+
+            _state = INACTIVE_STATE;
 
             foreach (var zone in _zones)
             {
@@ -120,13 +124,13 @@ namespace ISaveWater
 
         private int AlertCallback(string value)
         {
-            return _alert_callback(String.Format("Area ({}): {}", _id, value));
+            return _alert_callback("alert:" + _id + ":" + value);
         }
 
         private const string ACTIVE_STATE = "ACTIVE";
         private const string INACTIVE_STATE = "INACTIVE";
 
-        private double INACTIVE_MAX_THRESHOLD = 1.0;
+        private double INACTIVE_MAX_THRESHOLD = 2.0;
         private double ACTIVE_MIN_THRESHOLD = 3.0;
 
         private string _id;

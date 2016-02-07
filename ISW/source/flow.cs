@@ -9,40 +9,50 @@ namespace ISaveWater
 {
     class Flow
     {
-        public Flow(string id, GpioPin pin, Func<string, int> alert_callback = null)
+        public Flow(string id, GpioPin pin)
         {
             _id = id;
             _pin = pin;
             _pin.DebounceTimeout = new TimeSpan(0, 0, 0, 0, 50);
             _pin.SetDriveMode(GpioPinDriveMode.InputPullUp);
             _pin.ValueChanged += FlowPin_ValueChanged;
-            if (alert_callback != null)
-            {
-                _alert_callbacks.Add(alert_callback);
-            }
+            _ma = new MovingAverageFilter(10);
+            _alert_callbacks = new List<Func<string, int>>();
+            _avg_flow = 0.0;
 
-            var t = Task.Run(async delegate
+        }
+
+        public void Start()
+        {
+            Task.Run(() => Sample());
+        }
+
+        private async Task Sample()
+        {
+            int samples = 1;
+            int frequency;
+
+            while (true)
             {
-                while (true)
+                samples++;
+                if (samples > 20)
                 {
-                    double limit = 0.0;
-                    if (_avg_flow > MAX_FLOW)
+                    lock (_sync_lock)
                     {
-                        limit = MAX_FLOW;
+                        frequency = _low_to_high_count;
+                        _low_to_high_count = 0;
                     }
-                    if (_avg_flow < MIN_FLOW)
-                    {
-                        limit = MIN_FLOW;
-                    }
+                    PulseFrequencyToGpm(_ma.Update((double)frequency));
+                    samples = 1;
 
-                    foreach (var callback in _alert_callbacks)
-                    {
-                        callback(String.Format("Flow ({}): current flow {} exceeds limit {}", _id, _avg_flow, limit));
-                    }
-                    await Task.Delay(500);
                 }
-            });
+                await Task.Delay(50);
+            }
+        }
 
+        public string Id()
+        {
+            return _id;
         }
 
         public double Rate() { return _avg_flow; }
@@ -55,30 +65,39 @@ namespace ISaveWater
             }
         }
 
-        private double PulseFrequencyToGpm(double frequency)
+        private void PulseFrequencyToGpm(double frequency)
         {
-            return frequency;
+            // Convert between pulse frequency and gallons per minute
+            _avg_flow = frequency;
         }
 
         private void FlowPin_ValueChanged(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
-            double frequency;
+            //double frequency;
             GpioPinValue state = _pin.Read();
 
             if (_last_flow_state == GpioPinValue.Low && state == GpioPinValue.High)
             {
+                lock (_sync_lock)
+                {
+                    _low_to_high_count++;
+                }
+                /*
                 long current_time = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
 
                 frequency = (1.0 / (current_time - _last_time)) * MILLISECONDS_PER_SECOND;
                 _avg_flow = PulseFrequencyToGpm(_ma.Update(frequency));
                 _last_time = current_time;
+                */
             }
             _last_flow_state = state;
         }
 
         private const int MILLISECONDS_PER_SECOND = 1000;
-        private const double MIN_FLOW = 1.0;
+        private const double MIN_FLOW = 0.0;
         private const double MAX_FLOW = 10.0;
+
+        private System.Object _sync_lock = new System.Object();
 
         private string _id;
         private GpioPin _pin;
@@ -88,5 +107,6 @@ namespace ISaveWater
         private GpioPinValue _last_flow_state;
         private MovingAverageFilter _ma;
         private double _avg_flow;
+        private int _low_to_high_count;
     };
 }

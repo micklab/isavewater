@@ -10,30 +10,32 @@ namespace ISaveWater
 
     class Zone
     {
-        public Zone(string id, GpioPin pin, Func<string, int> alert_callback = null)
+        public Zone(string id, GpioPin pin)
         {
             _id = id;
             _pin = pin;
             _pin.Write(GpioPinValue.Low);
             _pin.SetDriveMode(GpioPinDriveMode.Output);
-            _state = ON_STATE;
-            if (alert_callback != null)
-            {
-                _alert_callbacks.Add(alert_callback);
-            }
+            _state = OFF_STATE;
+            _alert_callbacks = new List<Func<string, int>>();
+        }
+
+        public string Id()
+        {
+            return _id;
+        }
+
+        public string State()
+        {
+            return _state;
         }
 
         public void Enable()
         {
 
-            // Turn on the valve
+            // Turn on the zone
             _state = ON_STATE;
             _pin.Write(GpioPinValue.High);
-
-            foreach (var callback in _alert_callbacks)
-            {
-                callback(String.Format("Value ({}): state change {}", _id, _state));
-            }
         }
 
         public void Disable()
@@ -41,14 +43,9 @@ namespace ISaveWater
             // Turn off the valve
             _state = OFF_STATE;
             _pin.Write(GpioPinValue.Low);
-
-            foreach (var callback in _alert_callbacks)
-            {
-                callback(String.Format("Value ({}): state change {}", _id, _state));
-            }
         }
 
-public void AddAlertCallback(Func<string, int> callback)
+        public void AddAlertCallback(Func<string, int> callback)
         {
             if (callback != null)
             {

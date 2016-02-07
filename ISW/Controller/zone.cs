@@ -16,6 +16,7 @@ namespace ISaveWater
             _pin = pin;
             _pin.Write(GpioPinValue.Low);
             _pin.SetDriveMode(GpioPinDriveMode.Output);
+            _pin.Write(GpioPinValue.High);
             _state = OFF_STATE;
             _alert_callbacks = new List<Func<string, int>>();
         }
@@ -35,14 +36,14 @@ namespace ISaveWater
 
             // Turn on the zone
             _state = ON_STATE;
-            _pin.Write(GpioPinValue.High);
+            _pin.Write(GpioPinValue.Low);
         }
 
         public void Disable()
         {
             // Turn off the valve
             _state = OFF_STATE;
-            _pin.Write(GpioPinValue.Low);
+            _pin.Write(GpioPinValue.High);
         }
 
         public void AddAlertCallback(Func<string, int> callback)
