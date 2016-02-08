@@ -1,0 +1,91 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace ISaveWater
+{
+
+    class AzureCommand
+    {
+        public string command { get; set; }
+        public string action { get; set; }
+        public string data { get; set; }
+    }
+
+    class AzureManualData
+    {
+        public string area { get; set; }
+        public string state { get; set; }
+    }
+
+    class ScheduleData
+    {
+        public DateTime start_time { get; set; }
+        public UInt32 duration { get; set; }
+    }
+
+    class AzureScheduleEntry
+    {
+        public string area { get; set; }
+        public ScheduleData data { get; set; }
+    }
+
+    class AzureScheduleData
+    {
+        public List<AzureScheduleEntry> entries { get; set; }
+    }
+
+    class FlowData
+    {
+        public string id { get; set; }
+        public double rate { get; set; }
+        public string state { get; set; }
+    }
+
+    class OverCurrentData
+    {
+        public string id { get; set; }
+        public string state { get; set; }
+    }
+
+    class ZoneData
+    {
+        public string id { get; set; }
+        public string state { get; set; }
+    }
+
+    class FlowAlert
+    {
+        public string id { get; set; }
+        public FlowData data { get; set; }
+    }
+
+    class FlowAlertRoot
+    {
+        public FlowAlert alert { get; set; }
+    }
+
+    class OverrCurrentAlert
+    {
+        public string id { get; set; }
+        public OverCurrentData data { get; set; }
+    }
+
+    class OverCurrentAlertRoot
+    {
+        public OverrCurrentAlert alert { get; set; }
+    }
+
+    class Status
+    {
+        public string id { get; set; }
+        public List<ZoneData> zones { get; set; }
+        public FlowData flow { get; set; }
+        public OverCurrentData overcurrent { get; set; }
+    }
+
+    class StatusRoot
+    {
+        public Status status { get; set; }
+    }
+
+}

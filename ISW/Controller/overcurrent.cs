@@ -51,13 +51,12 @@ namespace ISaveWater
                 _state = NO_DETECT_STATE;
             }
 
-
             // Send an alert only on a change
             if (state_changed)
             {                
                 foreach (var callback in _alert_callbacks)
                 {
-                    callback(_id + ":" + _state);
+                    callback("overcurrent:" + _id + ":" + _state);
                 }
             }
 
@@ -71,8 +70,8 @@ namespace ISaveWater
             }
         }
 
-        private const string NO_DETECT_STATE = "NONE";
-        private const string DETECT_STATE = "DETECT";
+        private const string NO_DETECT_STATE = "none";
+        private const string DETECT_STATE = "detect";
         //private const GpioPinValue INACTIVE = GpioPinValue.Low;
         private const GpioPinValue INACTIVE = GpioPinValue.High;
         //private const GpioPinValue ACTIVE = GpioPinValue.High;

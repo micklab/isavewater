@@ -100,14 +100,11 @@
     </SDKReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\source\azureclient.cs">
-      <Link>azureclient.cs</Link>
-    </Compile>
-    <Compile Include="..\source\controller.cs">
-      <Link>controller.cs</Link>
-    </Compile>
     <Compile Include="area.cs" />
+    <Compile Include="azureclient.cs" />
+    <Compile Include="controller.cs" />
     <Compile Include="flow.cs" />
+    <Compile Include="messages.cs" />
     <Compile Include="movingaverage.cs" />
     <Compile Include="overcurrent.cs" />
     <Compile Include="StartupTask.cs" />

@@ -4,9 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using Newtonsoft.Json;
+using Windows.System.Threading;
 
 namespace ISaveWater
 {
+
     class Area
     {
         public Area(string id, List<Zone> zones, Flow flow, OverCurrent over_current, Func<string, int> alert_callback)
@@ -17,13 +20,9 @@ namespace ISaveWater
             _over_current = over_current;
             _alert_callback = alert_callback;
 
-            foreach (var valve in _zones)
-            {
-                valve.AddAlertCallback(AlertCallback);
-            }
-            _flow.AddAlertCallback(AlertCallback);
             _over_current.AddAlertCallback(AlertCallback);
             _state = INACTIVE_STATE;
+            _schedule = new List<ScheduleData>();
         }
 
         public void Start()
@@ -44,7 +43,12 @@ namespace ISaveWater
                     var flow_rate = _flow.Rate();
                     if (flow_rate < ACTIVE_MIN_THRESHOLD)
                     {
-                        _alert_callback("alert:" + _id + ":" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":blocked");
+                        _flow_state = "blocked";
+                        AlertCallback("flow:" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":" + _flow_state);
+                    }
+                    else
+                    {
+                        _flow_state = "normal";
                     }
                 }
 
@@ -53,7 +57,12 @@ namespace ISaveWater
                     var flow_rate = _flow.Rate();
                     if (flow_rate > INACTIVE_MAX_THRESHOLD)
                     {
-                        _alert_callback("alert:" + _id + ":" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":leak");
+                        _flow_state = "leaking";
+                        AlertCallback("flow:" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":" + _flow_state);
+                    }
+                    else
+                    {
+                        _flow_state = "none";
                     }
                 }
 
@@ -67,8 +76,48 @@ namespace ISaveWater
                 //       1. enable the relevant valves
                 //       2. start a timer for the specified duration which upon expiry will turn off the valves
 
+                if (!_is_event_scheduled)
+                {
+                    if (_schedule.Count > 1)
+                    {
+                        var entry = _schedule.ElementAt(0);
+
+                        var start_time = DateTime.Now.Subtract(entry.start_time).Seconds;
+                        _duration = (int) entry.duration;
+                        if (_timer != null)
+                        {
+                            _timer.Cancel();
+                        }
+                        _timer = ThreadPoolTimer.CreateTimer(Scheduler_Callback, TimeSpan.FromSeconds(start_time));
+
+                        _is_event_scheduled = true;
+                    }
+                }
+
                 await Task.Delay(1000);
             }
+        }
+
+        private async Task ExecuteEvent(int duration)
+        {
+            foreach (var zone in _zones)
+            {
+                zone.Enable();
+            }
+
+            await Task.Delay(duration * 1000);
+
+            foreach (var zone in _zones)
+            {
+                zone.Disable();
+            }
+
+            _is_event_scheduled = false;
+        }
+
+        private void Scheduler_Callback(ThreadPoolTimer timer)
+        {
+            Task.Run(() => ExecuteEvent(_duration));
         }
 
         public string Id()
@@ -102,29 +151,85 @@ namespace ISaveWater
 
         public string Status()
         {
-            /* I think a json string would be good here */
-            /* <area id>/<zone 1 id>:<state>, <zone 2 id>:<state>/<flow id>:<flow>/<health id>:<state> */
-            string status = "status:";
-
+            var zones_status = new List<ZoneData>();
             foreach (var zone in _zones)
             {
-                status += zone.Id() + ":" + zone.State() + ",";
+                zones_status.Add(new ZoneData() { id = zone.Id(), state = zone.State() });
             }
 
-            status += _flow.Id() + ":" + _flow.Rate().ToString("F1") + ",";
-            status += _over_current.Id() + ":" + _over_current.State();
+            var status = new StatusRoot() { status = new Status() { id = "status",
+                                                                    zones = zones_status,
+                                                                    flow = new FlowData() { id = _flow.Id(), rate = _flow.Rate(), state = _flow_state },
+                                                                    overcurrent = new OverCurrentData() { id = _over_current.Id(), state = _over_current.State() } } };
 
-            return status;
+            return JsonConvert.SerializeObject(status);
         }
 
-        public void AddScheduleEvent(string sch_event)
+        public void ClearSchedule()
         {
-            // Insert the event into the schedule
+            _schedule.Clear();
+        }
+
+        public void AddScheduleEvent(ScheduleData entry)
+        {
+            _schedule.Add(entry);
+            _schedule.Sort(delegate (ScheduleData x, ScheduleData y)
+            {
+                if (x.start_time == null && y.start_time == null)
+                    return 0;
+                else if (x.start_time == null)
+                    return -1;
+                else if (y.start_time == null)
+                    return 1;
+                else
+                    return x.start_time.CompareTo(y.start_time);
+            });
         }
 
         private int AlertCallback(string value)
         {
-            return _alert_callback("alert:" + _id + ":" + value);
+            /*
+            split value on ':' to get either id, state for over current or id, rate, state for flow
+
+            */
+            string message = "";
+            var result = value.Split(':');
+
+            switch (result[0])
+            {
+                case "flow":
+                    message = JsonConvert.SerializeObject(new FlowAlertRoot()
+                                                              { alert = new FlowAlert()
+                                                                  { id = "alert",
+                                                                    data = new FlowData()
+                                                                      { id = result[0],
+                                                                        rate = Convert.ToDouble(result[1]),
+                                                                        state = result[2]
+                                                                      }
+                                                                  }
+                                                              }, 
+                                                          Formatting.Indented);
+                    break;
+
+                case "overcurrent":
+                    message = JsonConvert.SerializeObject(new OverCurrentAlertRoot()
+                                                              { alert = new OverrCurrentAlert()
+                                                                  { id  = "alert",
+                                                                    data = new OverCurrentData()
+                                                                      { id = result[0],
+                                                                        state = result[1]
+                                                                      }
+                                                                  } 
+                                                              },
+                                                          Formatting.Indented);
+                    break;
+
+                default:
+                    message = "unknown alert type";
+                    break;
+            }
+
+            return _alert_callback(message);
         }
 
         private const string ACTIVE_STATE = "ACTIVE";
@@ -139,7 +244,11 @@ namespace ISaveWater
         private OverCurrent _over_current;
         private Func<string, int> _alert_callback;
         private string _state;
-
+        private string _flow_state = "none";
+        private List<ScheduleData> _schedule;
+        private bool _is_event_scheduled;
+        private int _duration;
+        private ThreadPoolTimer _timer;
     }
 
 }

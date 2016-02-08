@@ -15,23 +15,16 @@ namespace ISaveWater
     public sealed class StartupTask : IBackgroundTask
     {
         BackgroundTaskDeferral deferral;
-        //private ThreadPoolTimer timer;
         private AzureClient _azure_client;
         private Controller _controller;
 
         public void Run(IBackgroundTaskInstance taskInstance)
         {
             deferral = taskInstance.GetDeferral();
-            //timer = ThreadPoolTimer.CreatePeriodicTimer(Timer_Tick, TimeSpan.FromMilliseconds(500));
 
             Initialize();
             Start();
         }
-
-        //private void Timer_Tick(ThreadPoolTimer timer)
-        //{
-        //    Debug.WriteLine("tick, tock");
-        //}
 
         private void Initialize()
         {

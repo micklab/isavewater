@@ -48,14 +48,6 @@ namespace ISaveWater
             {
                 var message = _outgoing_queue.Take();
 
-                /*
-                var telemetryDataPoint = new
-                {
-                    deviceId = "myFirstDevice",
-                    windSpeed = currentWindSpeed
-                };
-                var messageString = JsonConvert.SerializeObject(telemetryDataPoint);
-                */
                 var eventMessage = new Message(Encoding.UTF8.GetBytes(message));
                 Debug.WriteLine(message);
 
@@ -82,7 +74,8 @@ namespace ISaveWater
 
                 //  Note: In this sample, the polling interval is set to 
                 //  10 seconds to enable you to see messages as they are sent.
-                //  To enable an IoT solution to scale, you should extend this //  interval. For example, to scale to 1 million devices, set 
+                //  To enable an IoT solution to scale, you should extend this 
+                //  interval. For example, to scale to 1 million devices, set 
                 //  the polling interval to 25 minutes.
                 //  For further information, see
                 //  https://azure.microsoft.com/documentation/articles/iot-hub-devguide/#messaging

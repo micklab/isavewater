@@ -18,7 +18,6 @@ namespace ISaveWater
             _pin.SetDriveMode(GpioPinDriveMode.Output);
             _pin.Write(GpioPinValue.High);
             _state = OFF_STATE;
-            _alert_callbacks = new List<Func<string, int>>();
         }
 
         public string Id()
@@ -46,21 +45,12 @@ namespace ISaveWater
             _pin.Write(GpioPinValue.High);
         }
 
-        public void AddAlertCallback(Func<string, int> callback)
-        {
-            if (callback != null)
-            {
-                _alert_callbacks.Add(callback);
-            }
-        }
-
         private const string ON_STATE = "ON";
         private const string OFF_STATE = "OFF";
 
         private string _id;
         private GpioPin _pin;
         private string _state;
-        private List<Func<string, int> > _alert_callbacks;
 
     };
 
