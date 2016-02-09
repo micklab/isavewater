@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace ISaveWater
 {
@@ -7,14 +8,17 @@ namespace ISaveWater
     class AzureCommand
     {
         public string command { get; set; }
-        public string action { get; set; }
-        public string data { get; set; }
     }
 
     class AzureManualData
     {
         public string area { get; set; }
         public string state { get; set; }
+    }
+
+    class AzureManualCommand : AzureCommand
+    {
+        public AzureManualData data { get; set; }
     }
 
     class ScheduleData
@@ -33,6 +37,13 @@ namespace ISaveWater
     {
         public List<AzureScheduleEntry> entries { get; set; }
     }
+
+    class AzureScheduleCommand : AzureCommand
+    {
+        public string action { get; set; }
+        public AzureScheduleData data { get; set; }
+    }
+
 
     class FlowData
     {

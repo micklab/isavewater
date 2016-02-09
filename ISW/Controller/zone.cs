@@ -45,8 +45,8 @@ namespace ISaveWater
             _pin.Write(GpioPinValue.High);
         }
 
-        private const string ON_STATE = "ON";
-        private const string OFF_STATE = "OFF";
+        private const string ON_STATE = "on";
+        private const string OFF_STATE = "off";
 
         private string _id;
         private GpioPin _pin;

@@ -43,12 +43,12 @@ namespace ISaveWater
                     var flow_rate = _flow.Rate();
                     if (flow_rate < ACTIVE_MIN_THRESHOLD)
                     {
-                        _flow_state = "blocked";
+                        _flow_state = FLOW_STATE_BLOCKED;
                         AlertCallback("flow:" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":" + _flow_state);
                     }
                     else
                     {
-                        _flow_state = "normal";
+                        _flow_state = FLOW_STATE_NORMAL;
                     }
                 }
 
@@ -57,12 +57,12 @@ namespace ISaveWater
                     var flow_rate = _flow.Rate();
                     if (flow_rate > INACTIVE_MAX_THRESHOLD)
                     {
-                        _flow_state = "leaking";
+                        _flow_state = FLOW_STATE_LEAKING;
                         AlertCallback("flow:" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":" + _flow_state);
                     }
                     else
                     {
-                        _flow_state = "none";
+                        _flow_state = FLOW_STATE_NONE;
                     }
                 }
 
@@ -76,6 +76,7 @@ namespace ISaveWater
                 //       1. enable the relevant valves
                 //       2. start a timer for the specified duration which upon expiry will turn off the valves
 
+                /*
                 if (!_is_event_scheduled)
                 {
                     if (_schedule.Count > 1)
@@ -93,7 +94,7 @@ namespace ISaveWater
                         _is_event_scheduled = true;
                     }
                 }
-
+                */
                 await Task.Delay(1000);
             }
         }
@@ -157,7 +158,7 @@ namespace ISaveWater
                 zones_status.Add(new ZoneData() { id = zone.Id(), state = zone.State() });
             }
 
-            var status = new StatusRoot() { status = new Status() { id = "status",
+            var status = new StatusRoot() { status = new Status() { id = _id,
                                                                     zones = zones_status,
                                                                     flow = new FlowData() { id = _flow.Id(), rate = _flow.Rate(), state = _flow_state },
                                                                     overcurrent = new OverCurrentData() { id = _over_current.Id(), state = _over_current.State() } } };
@@ -207,8 +208,7 @@ namespace ISaveWater
                                                                         state = result[2]
                                                                       }
                                                                   }
-                                                              }, 
-                                                          Formatting.Indented);
+                                                              });
                     break;
 
                 case "overcurrent":
@@ -216,12 +216,11 @@ namespace ISaveWater
                                                               { alert = new OverrCurrentAlert()
                                                                   { id  = "alert",
                                                                     data = new OverCurrentData()
-                                                                      { id = result[0],
-                                                                        state = result[1]
+                                                                      { id = result[1],
+                                                                        state = result[2]
                                                                       }
                                                                   } 
-                                                              },
-                                                          Formatting.Indented);
+                                                              });
                     break;
 
                 default:
@@ -232,8 +231,13 @@ namespace ISaveWater
             return _alert_callback(message);
         }
 
-        private const string ACTIVE_STATE = "ACTIVE";
-        private const string INACTIVE_STATE = "INACTIVE";
+        private const string ACTIVE_STATE = "active";
+        private const string INACTIVE_STATE = "inactive";
+
+        private const string FLOW_STATE_BLOCKED = "blocked";
+        private const string FLOW_STATE_NORMAL = "normal";
+        private const string FLOW_STATE_NONE = "none";
+        private const string FLOW_STATE_LEAKING = "leaking";
 
         private double INACTIVE_MAX_THRESHOLD = 2.0;
         private double ACTIVE_MIN_THRESHOLD = 3.0;

@@ -48,7 +48,7 @@ namespace ISaveWater
             return _id;
         }
 
-        public double Rate() { return _avg_flow; }
+        public double Rate() { return (double) Math.Round((decimal)_avg_flow, 1); }
 
         private void PulseFrequencyToGpm(double frequency)
         {

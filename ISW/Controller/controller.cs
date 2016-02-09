@@ -86,37 +86,6 @@ namespace ISaveWater
 
             while (true)
             {
-                var json = incoming_queue.Take();
-                Debug.WriteLine("Controller: received message from Azure - " + json);
-
-                // Parse the message
-                Debug.WriteLine("\tParsing message");
-
-                // The message can either be a "command" message or a "schedule" message
-                // If the message is a "command" it will be in the form:
-                //      <override>:<area>:on
-                //      <override>:<area>:off
-                // If the message is a "schedule" it will be in the form:
-                //      <schedule>:<area>:<action>:<date-time>:<duration>
-                //      where <action> can be "ADD", "DEL", "CHG"
-                Debug.WriteLine("\tMessage is either command or schedule");
-
-                //var result = data.Split(':');
-                //var command = result[0];
-                //var location = result[1];
-                //var action = result[2];
-                //Debug.WriteLine("\tCommand: " + command);
-                //Debug.WriteLine("\tLocation: " + location);
-                //Debug.WriteLine("\tAction: " + action);
-
-                // Dispatch the message
-                // Use <area> to identify the correct grove object
-                // Execute the command
-                //    if <area>:on then area.Activate
-                //    if <area>:off then area.Deactivate
-                //    if <area>:<action>:<date-time>:<duration> then area.AddScheduleEvent(<action>:<date-time>:<duration>
-                Debug.WriteLine("\tDispatching message to grove");
-
                 /*
                  What does the JSON  look like coming from Azure?
 
@@ -199,68 +168,65 @@ namespace ISaveWater
 
                  */
 
-                AzureCommand command = JsonConvert.DeserializeObject<AzureCommand>(json);
+                var json = incoming_queue.Take().ToLower();
+                Debug.WriteLine("Controller: received message from Azure - " + json);
 
-                switch (command.command)
+                if (json.Contains("manual"))
                 {
-                    case "manual":
-                        var manual_data = JsonConvert.DeserializeObject<AzureManualData>(command.data);
-
-                        foreach (var area in _areas)
+                    AzureManualCommand command = JsonConvert.DeserializeObject<AzureManualCommand>(json);
+                    foreach (var area in _areas)
+                    {
+                        if (area.Id().ToLower() == command.data.area)
                         {
-                            if (area.Id() == manual_data.area)
+                            if (command.data.state == "on")
                             {
-                                if (manual_data.state == "on")
-                                {
-                                    area.Activate();
-                                }
+                                area.Activate();
+                            }
 
-                                if (manual_data.state == "off")
-                                {
-                                    area.Deactivate();
-                                }
+                            if (command.data.state == "off")
+                            {
+                                area.Deactivate();
                             }
                         }
-                        break;
-
-                    case "schedule":
-                        var schedule_data = JsonConvert.DeserializeObject<AzureScheduleData>(command.data);
-
-                        switch (command.action)
-                        {
-                            case "clear":                                
-                                foreach (var entry in schedule_data.entries)
+                    }
+                }
+                else if (json.Contains("schedule"))
+                {
+                    AzureScheduleCommand command = JsonConvert.DeserializeObject<AzureScheduleCommand>(json);
+                    switch (command.action)
+                    {
+                        case "clear":
+                            foreach (var entry in command.data.entries)
+                            {
+                                foreach (var area in _areas)
                                 {
-                                    foreach (var area in _areas)
+                                    if (area.Id().ToLower() == entry.area)
                                     {
-                                        if (area.Id() == entry.area)
-                                        {
-                                            area.ClearSchedule();
-                                        }
+                                        area.ClearSchedule();
                                     }
                                 }
-                                break;
+                            }
+                            break;
 
-                            case "add":
-                                foreach (var entry in schedule_data.entries)
+                        case "add":
+                            foreach (var entry in command.data.entries)
+                            {
+                                foreach (var area in _areas)
                                 {
-                                    foreach (var area in _areas)
+                                    if (area.Id().ToLower() == entry.area)
                                     {
-                                        if (area.Id() == entry.area)
-                                        {
-                                            area.AddScheduleEvent(entry.data);
-                                        }
+                                        area.AddScheduleEvent(entry.data);
                                     }
                                 }
-                                break;
-
-                            default:
-                                break;
-                        }
-                        break;
-
-                    default:
-                        break;
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine("Unknown command: " + json);
                 }
 
                 await Task.Delay(1000);
