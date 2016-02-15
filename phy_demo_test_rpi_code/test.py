@@ -8,12 +8,13 @@ scriptpath = "/home/pi/Projects/Adafruit-Raspberry-Pi-Python-Code/Adafruit_ADS1x
 sys.path.append(os.path.abspath(scriptpath))
 from Adafruit_ADS1x15 import ADS1x15
 
+GPIO.setmode(GPIO.BCM)
 # Constants
-PUMP_GPIO = 4     # GPIO pin
+PUMP_GPIO = 17     # GPIO pin
 PUMP_OFF = 1
 PUMP_ON = 0
 
-VALVE_GPIO = 17     # GPIO pin
+VALVE_GPIO = 4     # GPIO pin
 VALVE_OFF = 1
 VALVE_ON = 0
 
@@ -25,11 +26,9 @@ RUN_ON = 0
 
 LED_OFF = 1
 LED_ON = 0
-OPEN_VALVE_LED_GPIO = 23     # GPIO pin
-SHORTED_VALVE_LED_GPIO = 24     # GPIO pin
-LEAK_LED_GPIO = 25     # GPIO pin
-BLOCKAGE_LED_GPIO = 8     # GPIO pin
-HEARTBEAT_LED_GPIO = 7     # GPIO pin
+BAD_VALVE_LED_GPIO = 18     # GPIO pin
+BLOCKAGE_LED_GPIO = 15     # GPIO pin
+LEAK_LED_GPIO = 14     # GPIO pin
 
 # Initialize the Analog to Digital converter for reading the current sensor
 ADS1015 = 0x00  # 12-bit ADC
@@ -64,7 +63,6 @@ sense = SenseHat()
 sense.set_rotation(180)
 red = (255, 0, 0)
 
-GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False) # warnings off
 GPIO.setup(PUMP_GPIO, GPIO.OUT, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(VALVE_GPIO, GPIO.OUT, pull_up_down=GPIO.PUD_UP)
@@ -72,19 +70,15 @@ GPIO.setup(VALVE_GPIO, GPIO.OUT, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(FLOW_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(RUN_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-GPIO.setup(OPEN_VALVE_LED_GPIO, GPIO.OUT)
-GPIO.setup(SHORTED_VALVE_LED_GPIO, GPIO.OUT)
+GPIO.setup(BAD_VALVE_LED_GPIO, GPIO.OUT)
 GPIO.setup(LEAK_LED_GPIO, GPIO.OUT)
 GPIO.setup(BLOCKAGE_LED_GPIO, GPIO.OUT)
-GPIO.setup(HEARTBEAT_LED_GPIO, GPIO.OUT)
 
 GPIO.output(PUMP_GPIO, PUMP_OFF)
 GPIO.output(VALVE_GPIO, VALVE_OFF)
-GPIO.output(OPEN_VALVE_LED_GPIO, LED_OFF)
-GPIO.output(SHORTED_VALVE_LED_GPIO, LED_OFF)
+GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
 GPIO.output(LEAK_LED_GPIO, LED_OFF)
 GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
-GPIO.output(HEARTBEAT_LED_GPIO, LED_ON)
 
 # functions
 global flow_count
@@ -111,6 +105,7 @@ try:
 
             while run_button == 0:
 # read A to D converter to measure valve current
+                valve_mv = 0.0
                 valve_mv = DISTANCE_HANDLE.readADCSingleEnded(0, gain, sps)
 
 # count the number of pulses in one second
@@ -127,13 +122,20 @@ try:
             GPIO.output(VALVE_GPIO, VALVE_OFF)
 
         else:
-            time.sleep(1)           # wait 
+            time.sleep(1)           # wait
+
+            GPIO.output(BAD_VALVE_LED_GPIO, LED_ON)
+            GPIO.output(LEAK_LED_GPIO, LED_ON)
+            GPIO.output(BLOCKAGE_LED_GPIO, LED_ON)
             
         
 except KeyboardInterrupt:
     sense.clear
     GPIO.output(PUMP_GPIO, PUMP_OFF)
     GPIO.output(VALVE_GPIO, VALVE_OFF)
+    GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
+    GPIO.output(LEAK_LED_GPIO, LED_OFF)
+    GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
     GPIO.cleanup()       # clean up GPIO on CTRL+C exit
     cb.cancel() # Cancel callback.
     pi.stop()   # Disconnect from Pi.
@@ -146,5 +148,8 @@ cb.cancel() # Cancel callback.
 pi.stop()   # Disconnect from Pi.
 GPIO.output(PUMP_GPIO, PUMP_OFF)
 GPIO.output(VALVE_GPIO, VALVE_OFF)
+GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
+GPIO.output(LEAK_LED_GPIO, LED_OFF)
+GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
 GPIO.cleanup()       # clean up GPIO on normal exit
 
