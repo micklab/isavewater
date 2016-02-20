@@ -29,8 +29,8 @@ RUN_ON = 0
 LED_OFF = 1
 LED_ON = 0
 BAD_VALVE_LED_GPIO = 18     # GPIO pin
-BLOCKAGE_LED_GPIO = 15     # GPIO pin
-LEAK_LED_GPIO = 14     # GPIO pin
+BLOCKAGE_LED_GPIO = 14     # GPIO pin
+LEAK_LED_GPIO = 15     # GPIO pin
 OVERCURRENT_GPIO = 16     # GPIO pin
 
 # Initialize the Analog to Digital converter for reading the current sensor
@@ -95,10 +95,58 @@ def flow_callback(gpio, level, tick):
 
 cb = pi.callback(FLOW_GPIO, pigpio.FALLING_EDGE, flow_callback) # interrupt mechanism
 
+BAD_VALVE_COUNT = 0
+BLOCKAGE_COUNT = 0
+LEAK_COUNT = 0
+
+LPM_LOW_LIMIT = 1
+LPM_NOMINAL = 3
+LPM_HIGH_LIMIT = 5
 LPM2GPM = 0.264172  # Liters per minute to gallons per minute factor
 def flow_calculator (freq):
-    return (LPM2GPM*(freq/5.5))
-    
+#    return (LPM2GPM*(freq/5.5))    # in GPM
+    return (freq/5.5)               # in LPM
+
+valve_mv = 0.0
+def flow_measure ():
+    global flow_count
+    print ("Checking flow")
+    flow_count = 0
+    time.sleep(1)           # wait 
+    gpm_flow_count = int(flow_calculator(flow_count))
+    sense.show_message("{}".format(gpm_flow_count), text_colour=name_to_rgb("teal"))
+
+# read A to D converter to measure valve current
+    global valve_mv
+    valve_mv = 0.0
+    valve_mv = DISTANCE_HANDLE.readADCSingleEnded(0, gain, sps)
+
+    print("{} LPM and Valve current = {:4.1f}".format(gpm_flow_count, valve_mv))
+
+    return gpm_flow_count, valve_mv
+
+overcurrent = 1
+def check_overcurrent():
+    global overcurrent
+    print ("Checking overcurrent")
+    overcurrent = 1
+    overcurrent = GPIO.input(OVERCURRENT_GPIO)
+    BAD_VALVE_COUNT = 0
+    if (overcurrent == 0):
+        GPIO.output(PUMP_GPIO, PUMP_OFF)
+        GPIO.output(VALVE_GPIO, VALVE_OFF)
+        GPIO.output(BAD_VALVE_LED_GPIO, LED_ON)
+        print ("OVERCURRENT WARNING! Zone 1 Valve failure!")
+        sense.show_message("OC!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+        BAD_VALVE_COUNT += 1
+        time.sleep(1)           # wait 
+    else:
+        GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
+        BAD_VALVE_COUNT = 0
+
+    return BAD_VALVE_COUNT
+
+#### Start of Main Loop
 try:
     print("Turn on the RUN button when ready\n>")        
     while True:
@@ -107,47 +155,82 @@ try:
         run_button = GPIO.input(RUN_GPIO)
         if (run_button == 0):
 
-# turn on the pump and valve
-            GPIO.output(PUMP_GPIO, PUMP_ON)
-            GPIO.output(VALVE_GPIO, VALVE_ON)
-            time.sleep(0.3)           # wait 
-
 # check for Over Current condition on valve
-            overcurrent = 1
-            overcurrent = GPIO.input(OVERCURRENT_GPIO)
-            if (overcurrent == 0):
-                GPIO.output(PUMP_GPIO, PUMP_OFF)
-                GPIO.output(VALVE_GPIO, VALVE_OFF)
-                sense.show_message("OC!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
-                print ("OVERCURRENT WARNING! Zone 1 Valve failure!")
-                time.sleep(0.3)
-                sense.clear
-                time.sleep(0.3)
+            BAD_VALVE_COUNT = check_overcurrent()
  
-            while (run_button == 0 and overcurrent == 1):
+# turn on the pump and valve
+            if (BAD_VALVE_COUNT == 0 and LEAK_COUNT == 0 and BLOCKAGE_COUNT == 0):
+                GPIO.output(PUMP_GPIO, PUMP_ON)
+                GPIO.output(VALVE_GPIO, VALVE_ON)
+                print ("Adjust relief valve until flow is 3 LPM")
+                gpm_flow_count = 0
+                while (gpm_flow_count >= LPM_HIGH_LIMIT or gpm_flow_count <= LPM_LOW_LIMIT):
+                    gpm_flow_count, valve_mv = flow_measure()
+                print ("Zone 1 is operating at nominal flow.")
 
-# read A to D converter to measure valve current
-                valve_mv = 0.0
-                valve_mv = DISTANCE_HANDLE.readADCSingleEnded(0, gain, sps)
+            gpm_flow_count = LPM_NOMINAL
+            while (run_button == 0 and BAD_VALVE_COUNT == 0 and LEAK_COUNT == 0 and BLOCKAGE_COUNT == 0):
 
 # count the number of pulses in one second
-                flow_count = 0
-                time.sleep(1)           # wait 
-                gpm_flow_count = int(flow_calculator(flow_count))
-                sense.show_message("{}".format(gpm_flow_count), text_colour=name_to_rgb("teal"))
-                print ("{} GPM {:4.1f} mv".format(gpm_flow_count, valve_mv))
+                gpm_flow_count, valve_mv = flow_measure()
 
+                if (gpm_flow_count >= LPM_HIGH_LIMIT):
+                    GPIO.output(PUMP_GPIO, PUMP_OFF)
+                    GPIO.output(VALVE_GPIO, VALVE_OFF)
+                    GPIO.output(LEAK_LED_GPIO, LED_ON)
+                    print ("WARNING! Zone 1 exceeding flow limit - possible leak.")
+                    sense.show_message("LK!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                    LEAK_COUNT += 1
+                    time.sleep(1)           # wait 
+                else:
+                    GPIO.output(LEAK_LED_GPIO, LED_OFF)
+                    LEAK_COUNT = 0
+
+                if (gpm_flow_count <= LPM_LOW_LIMIT):
+                    GPIO.output(PUMP_GPIO, PUMP_OFF)
+                    GPIO.output(VALVE_GPIO, VALVE_OFF)
+                    print ("WARNING! Zone 1 below flow limit - possible blockage.")
+                    sense.show_message("BL!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                    GPIO.output(BLOCKAGE_LED_GPIO, LED_ON)
+                    BLOCKAGE_COUNT += 1
+                    time.sleep(1)           # wait 
+                else:
+                    GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
+                    BLOCKAGE_COUNT = 0
+
+                BAD_VALVE_COUNT = check_overcurrent()
                 run_button = 1
                 run_button = GPIO.input(RUN_GPIO)
-                overcurrent = 1
-                overcurrent = GPIO.input(OVERCURRENT_GPIO)
 
 # turn off the pump and valve
             GPIO.output(PUMP_GPIO, PUMP_OFF)
             GPIO.output(VALVE_GPIO, VALVE_OFF)
 
+            if (LEAK_COUNT != 0):
+                GPIO.output(LEAK_LED_GPIO, LED_ON)
+                print ("WARNING! Zone 1 exceeding flow limit - possible leak.")
+                sense.show_message("LK!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                time.sleep(1)           # wait 
+
+            if (BLOCKAGE_COUNT != 0):
+                GPIO.output(BLOCKAGE_LED_GPIO, LED_ON)
+                print ("WARNING! Zone 1 below flow limit - possible blockage.")
+                sense.show_message("BL!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                time.sleep(1)           # wait 
+
         else:
+            print ("Zone 1 is off")
+# turn off the pump and valve
+            GPIO.output(PUMP_GPIO, PUMP_OFF)
+            GPIO.output(VALVE_GPIO, VALVE_OFF)
+
             sense.clear
+            GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
+            BAD_VALVE_COUNT = 0
+            GPIO.output(LEAK_LED_GPIO, LED_OFF)
+            LEAK_COUNT = 0
+            GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
+            BLOCKAGE_COUNT = 0
             time.sleep(1)           # wait
 
 #            GPIO.output(BAD_VALVE_LED_GPIO, LED_ON)
