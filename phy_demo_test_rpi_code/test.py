@@ -114,7 +114,21 @@ def flow_measure ():
     flow_count = 0
     time.sleep(1)           # wait 
     gpm_flow_count = int(flow_calculator(flow_count))
-    sense.show_message("{}".format(gpm_flow_count), text_colour=name_to_rgb("teal"))
+#    sense.show_message("{}".format(gpm_flow_count), text_colour=name_to_rgb("teal"))
+    if gpm_flow_count == 0:
+        sense.set_pixels(zero_liter)
+    elif gpm_flow_count == 1:
+        sense.set_pixels(one_liter)
+    elif gpm_flow_count == 2:
+        sense.set_pixels(two_liter)
+    elif gpm_flow_count == 3:
+        sense.set_pixels(three_liter)
+    elif gpm_flow_count == 4:
+        sense.set_pixels(four_liter)
+    elif gpm_flow_count == 5:
+        sense.set_pixels(five_liter)
+    else:
+        sense.set_pixels(six_liter)
 
 # read A to D converter to measure valve current
     global valve_mv
@@ -126,18 +140,23 @@ def flow_measure ():
     return gpm_flow_count, valve_mv
 
 overcurrent = 1
+BAD_VALVE_COUNT = 0
 def check_overcurrent():
-    global overcurrent
+    global overcurrent, BAD_VALVE_COUNT
     print ("Checking overcurrent")
     overcurrent = 1
     overcurrent = GPIO.input(OVERCURRENT_GPIO)
-    BAD_VALVE_COUNT = 0
     if (overcurrent == 0):
         GPIO.output(PUMP_GPIO, PUMP_OFF)
         GPIO.output(VALVE_GPIO, VALVE_OFF)
         GPIO.output(BAD_VALVE_LED_GPIO, LED_ON)
         print ("OVERCURRENT WARNING! Zone 1 Valve failure!")
-        sense.show_message("OC!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+        print (BAD_VALVE_COUNT % 2)
+        if (BAD_VALVE_COUNT % 2):
+            sense.set_pixels(blank)
+        else:
+            sense.set_pixels(oc)
+#        sense.show_message("OC!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
         BAD_VALVE_COUNT += 1
         time.sleep(1)           # wait 
     else:
@@ -146,13 +165,168 @@ def check_overcurrent():
 
     return BAD_VALVE_COUNT
 
+X = name_to_rgb("teal")
+Y = name_to_rgb("red")
+O = name_to_rgb("black")
+
+#print Y
+
+question_mark = [
+O, O, O, X, X, O, O, O,
+O, O, X, O, O, X, O, O,
+O, O, O, O, O, X, O, O,
+O, O, O, O, X, O, O, O,
+O, O, O, X, O, O, O, O,
+O, O, O, X, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, X, O, O, O, O
+]
+
+blank = [
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O,
+O, O, O, O, O, O, O, O
+]
+
+oc = [
+O, Y, O, O, O, Y, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, O,
+O, Y, O, O, O, Y, O, Y
+]
+
+leak = [
+Y, O, O, Y, O, O, O, Y,
+Y, O, O, Y, O, Y, O, Y,
+Y, O, O, Y, O, Y, O, Y,
+Y, O, O, Y, Y, O, O, Y,
+Y, O, O, Y, O, Y, O, Y,
+Y, O, O, Y, O, Y, O, Y,
+Y, O, O, Y, O, O, O, O,
+Y, Y, O, Y, O, O, O, Y
+]
+
+blockage = [
+Y, Y, O, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, Y, O, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, Y,
+Y, O, Y, O, Y, O, O, O,
+Y, Y, O, O, Y, Y, O, Y
+]
+
+off = [
+O, X, O, X, X, O, X, X,
+X, O, X, X, O, O, X, O,
+X, O, X, X, O, O, X, O,
+X, O, X, X, X, O, X, X,
+X, O, X, X, O, O, X, O,
+X, O, X, X, O, O, X, O,
+X, O, X, X, O, O, X, O,
+O, X, O, X, O, O, X, O
+]
+
+zero_liter = [
+O, X, X, O, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+O, X, X, O, O, X, X, X
+]
+
+one_liter = [
+O, O, X, O, O, X, O, O,
+O, X, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, X, X, X, O, X, X, X
+]
+
+two_liter = [
+O, X, O, O, O, X, O, O,
+X, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, X, O, O, O, X, O, O,
+X, O, O, O, O, X, O, O,
+X, O, O, O, O, X, O, O,
+X, X, X, O, O, X, X, X
+]
+
+three_liter = [
+O, X, X, O, O, X, O, O,
+X, O, O, X, O, X, O, O,
+O, O, O, X, O, X, O, O,
+O, X, X, O, O, X, O, O,
+O, O, O, X, O, X, O, O,
+O, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+O, X, X, O, O, X, X, X
+]
+
+four_liter = [
+X, O, X, O, O, X, O, O,
+X, O, X, O, O, X, O, O,
+X, O, X, O, O, X, O, O,
+X, X, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, O, O,
+O, O, X, O, O, X, X, X
+]
+
+five_liter = [
+O, X, X, X, O, X, O, O,
+X, O, O, O, O, X, O, O,
+X, O, O, O, O, X, O, O,
+X, X, X, O, O, X, O, O,
+O, O, O, X, O, X, O, O,
+O, O, O, X, O, X, O, O,
+X, O, X, O, O, X, O, O,
+O, X, O, O, O, X, X, X
+]
+
+six_liter = [
+O, X, X, O, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, O, O, X, O, O,
+X, O, O, O, O, X, O, O,
+X, X, X, O, O, X, O, O,
+X, O, O, X, O, X, O, O,
+X, O, O, X, O, X, O, O,
+O, X, X, O, O, X, X, X
+]
+
+#############
 #### Start of Main Loop
+#############
 try:
     print("Turn on the RUN button when ready\n>")        
     while True:
 
+        if (BAD_VALVE_COUNT == 0 and LEAK_COUNT == 0 and BLOCKAGE_COUNT == 0):
+            sense.set_pixels(off)
+            
         run_button = 1
         run_button = GPIO.input(RUN_GPIO)
+
         if (run_button == 0):
 
 # check for Over Current condition on valve
@@ -182,7 +356,11 @@ try:
                     GPIO.output(VALVE_GPIO, VALVE_OFF)
                     GPIO.output(LEAK_LED_GPIO, LED_ON)
                     print ("WARNING! Zone 1 exceeding flow limit - possible leak.")
-                    sense.show_message("LK!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                    if (LEAK_COUNT % 2):
+                        sense.set_pixels(blank)
+                    else:
+                        sense.set_pixels(leak)
+#                    sense.show_message("LK!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
                     LEAK_COUNT += 1
                     time.sleep(1)           # wait 
                 else:
@@ -193,7 +371,11 @@ try:
                     GPIO.output(PUMP_GPIO, PUMP_OFF)
                     GPIO.output(VALVE_GPIO, VALVE_OFF)
                     print ("WARNING! Zone 1 below flow limit - possible blockage.")
-                    sense.show_message("BL!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                    if (BLOCKAGE_COUNT % 2):
+                        sense.set_pixels(blank)
+                    else:
+                        sense.set_pixels(blockage)
+#                    sense.show_message("BL!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
                     GPIO.output(BLOCKAGE_LED_GPIO, LED_ON)
                     BLOCKAGE_COUNT += 1
                     time.sleep(1)           # wait 
@@ -208,17 +390,20 @@ try:
 # turn off the pump and valve
             GPIO.output(PUMP_GPIO, PUMP_OFF)
             GPIO.output(VALVE_GPIO, VALVE_OFF)
+            sense.clear
 
             if (LEAK_COUNT != 0):
                 GPIO.output(LEAK_LED_GPIO, LED_ON)
                 print ("WARNING! Zone 1 exceeding flow limit - possible leak.")
-                sense.show_message("LK!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                sense.set_pixels(leak)
+#                sense.show_message("LK!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
                 time.sleep(1)           # wait 
 
             if (BLOCKAGE_COUNT != 0):
                 GPIO.output(BLOCKAGE_LED_GPIO, LED_ON)
                 print ("WARNING! Zone 1 below flow limit - possible blockage.")
-                sense.show_message("BL!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
+                sense.set_pixels(blockage)
+#                sense.show_message("BL!", text_colour=name_to_rgb("red"), back_colour=name_to_rgb("black"))
                 time.sleep(1)           # wait 
 
         else:
@@ -227,7 +412,6 @@ try:
             GPIO.output(PUMP_GPIO, PUMP_OFF)
             GPIO.output(VALVE_GPIO, VALVE_OFF)
 
-            sense.clear
             GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
             BAD_VALVE_COUNT = 0
             GPIO.output(LEAK_LED_GPIO, LED_OFF)
@@ -242,6 +426,7 @@ try:
             
         
 except KeyboardInterrupt:
+    sense.set_pixels(blank)
     sense.clear
     GPIO.output(PUMP_GPIO, PUMP_OFF)
     GPIO.output(VALVE_GPIO, VALVE_OFF)
@@ -254,6 +439,7 @@ except KeyboardInterrupt:
     exit()
 
 # normal exit
+sense.set_pixels(blank)
 sense.clear
 GPIO.setmode(GPIO.BCM)
 cb.cancel() # Cancel callback.
