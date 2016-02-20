@@ -159,7 +159,7 @@ try:
             BAD_VALVE_COUNT = check_overcurrent()
  
 # turn on the pump and valve
-            if (BAD_VALVE_COUNT == 0 and LEAK_COUNT == 0 and BLOCKAGE_COUNT == 0):
+            if (run_button == 0 and BAD_VALVE_COUNT == 0 and LEAK_COUNT == 0 and BLOCKAGE_COUNT == 0):
                 GPIO.output(PUMP_GPIO, PUMP_ON)
                 GPIO.output(VALVE_GPIO, VALVE_ON)
                 print ("Adjust relief valve until flow is 3 LPM")
@@ -169,6 +169,9 @@ try:
                 print ("Zone 1 is operating at nominal flow.")
 
             gpm_flow_count = LPM_NOMINAL
+#############
+# Inner While loop
+#############
             while (run_button == 0 and BAD_VALVE_COUNT == 0 and LEAK_COUNT == 0 and BLOCKAGE_COUNT == 0):
 
 # count the number of pulses in one second
@@ -245,7 +248,7 @@ except KeyboardInterrupt:
     GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
     GPIO.output(LEAK_LED_GPIO, LED_OFF)
     GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
-    GPIO.cleanup()       # clean up GPIO on CTRL+C exit
+#    GPIO.cleanup()       # clean up GPIO on CTRL+C exit
     cb.cancel() # Cancel callback.
     pi.stop()   # Disconnect from Pi.
     exit()
@@ -260,5 +263,5 @@ GPIO.output(VALVE_GPIO, VALVE_OFF)
 GPIO.output(BAD_VALVE_LED_GPIO, LED_OFF)
 GPIO.output(LEAK_LED_GPIO, LED_OFF)
 GPIO.output(BLOCKAGE_LED_GPIO, LED_OFF)
-GPIO.cleanup()       # clean up GPIO on normal exit
+#GPIO.cleanup()       # clean up GPIO on normal exit
 
