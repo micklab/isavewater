@@ -86,147 +86,17 @@ namespace ISaveWater
 
             while (true)
             {
-                /*
-                 What does the JSON  look like coming from Azure?
-
-                    Manual command
-                    {
-                        "command" : "manual",
-                        "action" : "",
-                        "data" :
-                        {
-                            "area" : "Area 1",
-                            "state" : "on|off"
-                        }
-                    }
-
-                    Schedule command
-                    {
-                        "command" : "schedule",
-                        "action"  : "clear|add"
-                        "data" :
-                        [
-                            {
-                                "id" : "Area 1",
-                                "date/time" : "MM:DD:YYYY, HH:MM:SS",
-                                "duration" : 300
-                            },
-                            {
-                            },
-                            {
-                            }
-                        ]
-                    }
-
-                    Config command
-                    {
-                        "command" : "config",
-                        "areas" : 
-                        [
-                            {    
-                                zones :
-                                [
-                                    {
-                                        "id" : "Zone N",
-                                        "pin" : 4
-                                    },
-                                    {
-                                        "id" : "Zone Z",
-                                        "pin" : 5
-                                    },
-                                    {
-                                        "id" : "Zone P",
-                                        "pin" : 6
-                                    }
-                                ],
-                                flow :
-                                {
-                                    "id" : "Flow N",
-                                    "pin" : 1
-                                }
-                                overcurrent:
-                                {
-                                    "id" : "OC N",
-                                    "pin" : 2
-                                }
-                        ]
-                        "flow" : 
-                        {
-                            "id" : "Flow F",
-                            "pin" : 9,
-                            "min_flow" : 0.0,
-                            "max_flow" : 2.0,
-                            "low_threshold" : 0.5,
-                            "high_threshold" : 1.5
-                        }
-                        "overcurrent":
-                        {
-                            "id" : "OC 1",
-                            "pin" : 10
-                        }
-                    }
-
-                 */
-
                 var json = incoming_queue.Take().ToLower();
                 Debug.WriteLine("Controller: received message from Azure - " + json);
 
-                if (json.Contains("manual"))
-                {
-                    AzureManualCommand command = JsonConvert.DeserializeObject<AzureManualCommand>(json);
-                    foreach (var area in _areas)
-                    {
-                        if (area.Id().ToLower() == command.data.area)
-                        {
-                            if (command.data.state == "on")
-                            {
-                                area.Activate();
-                            }
+                var command = JsonConvert.DeserializeObject<EventCommand>(json);
 
-                            if (command.data.state == "off")
-                            {
-                                area.Deactivate();
-                            }
-                        }
-                    }
-                }
-                else if (json.Contains("schedule"))
+                foreach (var area in _areas)
                 {
-                    AzureScheduleCommand command = JsonConvert.DeserializeObject<AzureScheduleCommand>(json);
-                    switch (command.action)
+                    if (area.Id() == command.area)
                     {
-                        case "clear":
-                            foreach (var entry in command.data.entries)
-                            {
-                                foreach (var area in _areas)
-                                {
-                                    if (area.Id().ToLower() == entry.area)
-                                    {
-                                        area.ClearSchedule();
-                                    }
-                                }
-                            }
-                            break;
-
-                        case "add":
-                            foreach (var entry in command.data.entries)
-                            {
-                                foreach (var area in _areas)
-                                {
-                                    if (area.Id().ToLower() == entry.area)
-                                    {
-                                        area.AddScheduleEvent(entry.data);
-                                    }
-                                }
-                            }
-                            break;
-                        default:
-                            break;
+                        area.AddEvent(command);
                     }
-                }
-                else
-                {
-                    Debug.WriteLine("Unknown command: " + json);
                 }
 
                 await Task.Delay(1000);
