@@ -37,11 +37,20 @@ namespace ISaveWater
     {
         public List<AzureScheduleEntry> entries { get; set; }
     }
-
+    
     class AzureScheduleCommand : AzureCommand
     {
         public string action { get; set; }
         public AzureScheduleData data { get; set; }
+    }
+    
+    class EventCommand
+    {
+        public DateTime current_time {get; set;}
+        public DateTime schedule_time {get; set;}
+        public string area {get; set;}
+        public string state {get; set;}
+        public int duration { get; set; }
     }
 
 

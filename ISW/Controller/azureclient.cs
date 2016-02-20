@@ -9,7 +9,7 @@ namespace ISaveWater
 {
     class AzureClient
     {
-        private const string DeviceConnectionString = "HostName=IrrigationManagement.azure-devices.net;DeviceId=MyNewDevice;SharedAccessKey=7DShm9V6xb4L4HqJ4gii0ER55wriOXhkLfPYJnhwh6c=";
+        private const string DeviceConnectionString = "HostName=IrrigationManagement.azure-devices.net;DeviceId=ISWController;SharedAccessKey=1rLRVVZKrBBoIoaEFHsI3Z1FMTGh+GNL+SnH4upMd78=";
         private BlockingCollection<string> _outgoing_queue = new BlockingCollection<string>();
         private Func<string, int> _callback;
         private Task[] tasks = new Task[2];
@@ -54,7 +54,7 @@ namespace ISaveWater
                 await deviceClient.SendEventAsync(eventMessage);
                 await Task.Delay(1000);
             }
-            
+
         }
 
         private async Task ReceiveCommands(DeviceClient deviceClient)
