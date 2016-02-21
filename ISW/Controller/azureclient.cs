@@ -51,7 +51,14 @@ namespace ISaveWater
                 var eventMessage = new Message(Encoding.UTF8.GetBytes(message));
                 Debug.WriteLine(message);
 
-                await deviceClient.SendEventAsync(eventMessage);
+                try
+                {
+                    await deviceClient.SendEventAsync(eventMessage);
+                }
+                catch
+                {
+                    Debug.WriteLine("SendEvent: Encountered an exception");
+                }
                 await Task.Delay(1000);
             }
 
@@ -60,26 +67,35 @@ namespace ISaveWater
         private async Task ReceiveCommands(DeviceClient deviceClient)
         {
             Debug.WriteLine("\nDevice waiting for commands from IoTHub...\n");
+            Message receivedMessage;
 
             while (true)
             {
-                var receivedMessage = await deviceClient.ReceiveAsync();
-
-                if (receivedMessage != null)
+                try
                 {
-                    _callback(Encoding.ASCII.GetString(receivedMessage.GetBytes()));
+                    receivedMessage = await deviceClient.ReceiveAsync();
 
-                    await deviceClient.CompleteAsync(receivedMessage);
+                    if (receivedMessage != null)
+                    {
+                        _callback(Encoding.ASCII.GetString(receivedMessage.GetBytes()));
+
+                        await deviceClient.CompleteAsync(receivedMessage);
+                    }
+
+                    //  Note: In this sample, the polling interval is set to 
+                    //  10 seconds to enable you to see messages as they are sent.
+                    //  To enable an IoT solution to scale, you should extend this 
+                    //  interval. For example, to scale to 1 million devices, set 
+                    //  the polling interval to 25 minutes.
+                    //  For further information, see
+                    //  https://azure.microsoft.com/documentation/articles/iot-hub-devguide/#messaging
+                    //await Task.Delay(TimeSpan.FromSeconds(10));
+                }
+                catch
+                {
+                    Debug.WriteLine("ReceiveCommands: Encountered an exception");
                 }
 
-                //  Note: In this sample, the polling interval is set to 
-                //  10 seconds to enable you to see messages as they are sent.
-                //  To enable an IoT solution to scale, you should extend this 
-                //  interval. For example, to scale to 1 million devices, set 
-                //  the polling interval to 25 minutes.
-                //  For further information, see
-                //  https://azure.microsoft.com/documentation/articles/iot-hub-devguide/#messaging
-                //await Task.Delay(TimeSpan.FromSeconds(10));
             }
         }
     }

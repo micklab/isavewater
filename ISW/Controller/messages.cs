@@ -57,7 +57,7 @@ namespace ISaveWater
     class FlowData
     {
         public string id { get; set; }
-        public double rate { get; set; }
+        public string rate { get; set; }
         public string state { get; set; }
     }
 

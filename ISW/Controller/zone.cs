@@ -16,8 +16,9 @@ namespace ISaveWater
             _pin = pin;
             _pin.Write(GpioPinValue.Low);
             _pin.SetDriveMode(GpioPinDriveMode.Output);
-            _pin.Write(GpioPinValue.High);
+            _pin.Write(GpioPinValue.High);            
             _state = OFF_STATE;
+
         }
 
         public string Id()
@@ -51,6 +52,7 @@ namespace ISaveWater
         private string _id;
         private GpioPin _pin;
         private string _state;
+        private GpioController _gpio_controller;
 
     };
 

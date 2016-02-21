@@ -36,14 +36,22 @@ namespace ISaveWater
 
         private async Task Sample()
         {
+            string last_state = INACTIVE_STATE;
+
             while (true)
             {
+                var flow_rate = _flow.Rate();
+
                 if (_state == ACTIVE_STATE)
                 {
-                    var flow_rate = _flow.Rate();
                     if (flow_rate < ACTIVE_MIN_THRESHOLD)
                     {
                         _flow_state = FLOW_STATE_BLOCKED;
+                        AlertCallback("flow:" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":" + _flow_state);
+                    }
+                    else if (flow_rate > ACTIVE_MAX_THRESHOLD)
+                    {
+                        _flow_state = FLOW_STATE_LEAKING;
                         AlertCallback("flow:" + _flow.Id() + ":" + flow_rate.ToString("F1") + ":" + _flow_state);
                     }
                     else
@@ -54,7 +62,6 @@ namespace ISaveWater
 
                 if (_state == INACTIVE_STATE)
                 {
-                    var flow_rate = _flow.Rate();
                     if (flow_rate > INACTIVE_MAX_THRESHOLD)
                     {
                         _flow_state = FLOW_STATE_LEAKING;
@@ -72,16 +79,25 @@ namespace ISaveWater
 
         private async Task ExecuteEvent(EventCommand command)
         {
+            Debug.WriteLine("Executing command: " + command.area + " state: " + command.state);
             if (command.state.ToLower() == "off")
             {
+                Debug.WriteLine("Deactivating Area " + _id);
+
+                _state = INACTIVE_STATE;
+
                 foreach (var zone in _zones)
                 {
                     zone.Disable();
                 }
             }
 
-            if (command.state.ToLower() == "on")
+            else if (command.state.ToLower() == "on")
             {
+                Debug.WriteLine("Activating Area " + _id);
+
+                _state = ACTIVE_STATE;
+
                 // the zones are sequenced so that only one zone is on at a time
                 foreach (var zone in _zones)
                 {
@@ -90,10 +106,15 @@ namespace ISaveWater
                     zone.Disable();
                 }
             }
+            else
+            {
+                Debug.WriteLine("Unknown command state: " + command.state);
+            }
         }
 
         private void Scheduler_Callback(ThreadPoolTimer timer)
         {
+            Debug.WriteLine("Event Timer has expired.");
             Task.Run(() => ExecuteEvent(_command));
         }
 
@@ -102,9 +123,9 @@ namespace ISaveWater
             return _id;
         }
 
+        /*
         public void Activate()
         {
-            Debug.WriteLine("Activating Area " + _id);
 
             _state = ACTIVE_STATE;
 
@@ -116,7 +137,6 @@ namespace ISaveWater
 
         public void Deactivate()
         {
-            Debug.WriteLine("Deactivating Area " + _id);
 
             _state = INACTIVE_STATE;
 
@@ -125,6 +145,7 @@ namespace ISaveWater
                 zone.Disable();
             }
         }
+        */
 
         public string Status()
         {
@@ -141,7 +162,7 @@ namespace ISaveWater
                 flow = new FlowData()
                 {
                     id = _flow.Id(),
-                    rate = _flow.Rate(),
+                    rate = _flow.Rate().ToString("F1"),
                     state = _flow_state
                 },
                 overcurrent = new OverCurrentData()
@@ -160,7 +181,9 @@ namespace ISaveWater
 
         public void AddEvent(EventCommand command)
         {
+            Debug.WriteLine("Adding event command");
             var start_time = command.schedule_time.Subtract(command.current_time).TotalSeconds;
+            Debug.WriteLine("event will start in " + start_time.ToString() + " seconds");
             if (start_time > 1)
             {
                 _command = command;
@@ -194,6 +217,7 @@ namespace ISaveWater
             split value on ':' to get either id, state for over current or id, rate, state for flow
             */
             string message = "";
+            //Debug.WriteLine(value);
             var result = value.Split(':');
 
             switch (result[0])
@@ -202,9 +226,9 @@ namespace ISaveWater
                     message = JsonConvert.SerializeObject(new FlowAlert()
                                                                   { id = "alert",
                                                                     data = new FlowData()
-                                                                      { id = result[0],
-                                                                        rate = Convert.ToDouble(result[1]),
-                                                                        state = result[2]
+                                                                      { id = result[1],
+                                                                        rate = result[2],
+                                                                        state = result[3]
                                                                       }
                                                                   });
                     break;
@@ -237,6 +261,7 @@ namespace ISaveWater
 
         private double INACTIVE_MAX_THRESHOLD = 2.0;
         private double ACTIVE_MIN_THRESHOLD = 3.0;
+        private double ACTIVE_MAX_THRESHOLD = 5.0;
 
         private string _id;
         private List<Zone> _zones;

@@ -86,7 +86,7 @@ namespace ISaveWater
 
             while (true)
             {
-                var json = incoming_queue.Take().ToLower();
+                var json = incoming_queue.Take();
                 Debug.WriteLine("Controller: received message from Azure - " + json);
 
                 var command = JsonConvert.DeserializeObject<EventCommand>(json);
