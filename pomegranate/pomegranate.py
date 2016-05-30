@@ -43,7 +43,7 @@ class flow_sensor(object):
     def __del__(self):
         print 'flow '+str(self.flow_zone)+' closed'
 
-    def flow_callback(self):
+    def flow_callback(self, gpio, level, tick):
         global flow_count
         flow_count += 1
 
@@ -55,9 +55,11 @@ class flow_sensor(object):
     def get_rate(self):
 
         global flow_count
-        print ("Checking flow")
         flow_count = 0
-        time.sleep(1)   # wait as the interrupts accumulate and increase the flow count 
+        print ("Checking flow")
+        time.sleep(1)   # wait as the interrupts accumulate and increase the flow count
+        print ("flow count = ", str(flow_count))
+
         return int(self.flow_calculator(flow_count))
 
 ############################
