@@ -72,15 +72,16 @@ class valve_current(object):
 
         while True:
             response = self.spi.readbytes(2)
-            print response
+##            print response
             lsb = response[1]
             msb = response[0]
-            print hex(msb)
-            print hex(lsb)
+##            print hex(msb)
+##            print hex(lsb)
             pmod_value = (msb << 8) | lsb
-            print hex(pmod_value)
-            print self.calculate_milliamps(pmod_value)
-            time.sleep(1)
+            ma = abs(self.calculate_milliamps(pmod_value))
+            if (ma > 0 and ma <600):
+                print '(0b{:016b}'.format(pmod_value), ') ({:5.1f}'.format(ma), 'ma)'
+            time.sleep(0.1)
 
 #        print 'valve current = '+str(self.current)+' in amps'
         return self.current
