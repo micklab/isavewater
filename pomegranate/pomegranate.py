@@ -7,6 +7,7 @@ import RPi.GPIO as GPIO
 import time, sys, os
 import pigpio # http://abyz.co.uk/rpi/pigpio/python.html
 import spidev
+import Adafruit_ADS1x15
 
 global flow_count
 flow_count = 0
@@ -25,7 +26,7 @@ class flow_sensor(object):
         pi = pigpio.pi()           # Connect to Pi.
         cb = pi.callback(self.flow_gpio, pigpio.FALLING_EDGE, self.flow_callback) # interrupt mechanism
 
-        print 'flow GPIO # =  '+str(self.flow_gpio)
+#        print 'flow GPIO # =  '+str(self.flow_gpio)
         
 # Done with initialization
                     
@@ -41,17 +42,17 @@ class flow_sensor(object):
     def flow_calculator (self, freq):
         LPM2GPM = 0.264172  # Liters per minute to gallons per minute factor
     #    return (LPM2GPM*(freq/5.5))    # in GPM
-        return (freq/5.5)               # in LPM
+        return float(freq/5.5)               # in LPM
 
     def get_rate(self):
 
         global flow_count
         flow_count = 0
-        print ("Checking flow")
+#        print ("Checking flow")
         time.sleep(1)   # wait as the interrupts accumulate and increase the flow count
-        print ("flow count = ", str(flow_count))
+#        print ("flow count = ", str(flow_count))
 
-        return int(self.flow_calculator(flow_count))
+        return float(self.flow_calculator(flow_count))
 
 ############################
 class valve_current(object):
@@ -62,7 +63,20 @@ class valve_current(object):
         self.valve_zone = valve_zone
         self.spi = spidev.SpiDev()
         self.spi.open(0,0)
+        
+        self.adc = Adafruit_ADS1x15.ADS1115()
+        # Choose a gain of 1 for reading voltages from 0 to 4.09V.
+        # Or pick a different gain to change the range of voltages that are read:
+        #  - 2/3 = +/-6.144V
+        #  -   1 = +/-4.096V
+        #  -   2 = +/-2.048V
+        #  -   4 = +/-1.024V
+        #  -   8 = +/-0.512V
+        #  -  16 = +/-0.256V
+        # See table 3 in the ADS1015/ADS1115 datasheet for more info on gain.
+        self.GAIN = 1
 
+        
     def calculate_milliamps(self, adc_value):
         adc_value_norm = adc_value - 2048
         return float((1000.0 * float(adc_value_norm)) / 89.95)
@@ -70,20 +84,54 @@ class valve_current(object):
     def get_current(self):
         self.current = 0.0
 
-        while True:
+##        print('Reading ADS1x15 values, press Ctrl-C to quit...')
+##        # Print nice channel column headers.
+##        print('| {0:>6} | {1:>6} | {2:>6} | {3:>6} |'.format(*range(4)))
+##        print('-' * 37)
+##        # Main loop.
+##        while True:
+##            # Read all the ADC channel values in a list.
+##            values = [0]*4
+##            for i in range(4):
+##                # Read the specified ADC channel using the previously set gain value.
+##                values[i] = self.adc.read_adc(i, gain=self.GAIN)
+##                # Note you can also pass in an optional data_rate parameter that controls
+##                # the ADC conversion time (in samples/second). Each chip has a different
+##                # set of allowed data rate values, see datasheet Table 9 config register
+##                # DR bit values.
+##                #values[i] = adc.read_adc(i, gain=GAIN, data_rate=128)
+##                # Each value will be a 12 or 16 bit signed integer value depending on the
+##                # ADC (ADS1015 = 12-bit, ADS1115 = 16-bit).
+##            # Print the ADC values.
+##            print('| {0:>6} | {1:>6} | {2:>6} | {3:>6} |'.format(*values))
+##            time.sleep(0.1)
+        count = 0
+        max = 0.0
+        min = 0.0
+        while count < 50:
             response = self.spi.readbytes(2)
-##            print response
+            #print response
             lsb = response[1]
             msb = response[0]
-##            print hex(msb)
-##            print hex(lsb)
+            #print hex(msb)
+            #print hex(lsb)
             pmod_value = (msb << 8) | lsb
-            ma = abs(self.calculate_milliamps(pmod_value))
-            if (ma > 0 and ma <600):
-                print '(0b{:016b}'.format(pmod_value), ') ({:5.1f}'.format(ma), 'ma)'
+            ma = self.calculate_milliamps(pmod_value)
+#                print '(0b{:016b}'.format(pmod_value), ') ({:5.1f}'.format(ma), 'ma)'
             time.sleep(0.1)
 
-#        print 'valve current = '+str(self.current)+' in amps'
+            if ma > max:
+                max = ma
+
+            if ma < min:
+                min = ma
+
+            count +=1
+
+            if count == 50:
+#                print '{:5.1f}'.format(max), 'ma'
+                self.current = max
+
         return self.current
 
 ##########################
@@ -96,7 +144,7 @@ class valve_power(object):
 
         GPIO.setup(self.valve_gpio, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
       
-        print 'valve status GPIO # =  '+str(self.valve_gpio)
+#        print 'valve status GPIO # =  '+str(self.valve_gpio)
         
 # Done with initialization
                     
@@ -128,23 +176,21 @@ if __name__ == '__main__':
     #### Start of Main Loop
     #############
     try:
-        print("Turn on the PUMP/MV switch when ready\n>")        
+        loop = 0
         while True:
-
-            print("Valve power status = ", str(valve_power_1.get_status()))        
-        #            if (valve_power_1.get_status == 1):
-
-        # check for Over Current condition on valve
-
-            print("Valve current = ", str(valve_current_1.get_current()))        
-        #            if (valve_current_1.get_current >= 0.0):
-
-        # get the flow rate
-            print("Flow rate = ", str(flow_sensor_1.get_rate()))        
-        #            if (flow_sensor_1.get_rate >= 0.0):
-
             time.sleep(0.5)
-            
+            valve_status = valve_power_1.get_status()
+            if (valve_status == 1):
+                flow = flow_sensor_1.get_rate()
+                current = valve_current_1.get_current()
+                print 'Flow rate = {:2.1f}'.format(flow), 'lpm and valve current = {:5.1f}'.format(current)
+                loop = 0
+            else:
+                if loop == 0:
+                    print "Waiting for valve to turn on"
+                    loop = 1
+
+
     except KeyboardInterrupt:
         exit()
 
