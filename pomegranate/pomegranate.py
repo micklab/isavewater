@@ -8,6 +8,7 @@ import time, sys, os
 import pigpio # http://abyz.co.uk/rpi/pigpio/python.html
 import spidev
 import Adafruit_ADS1x15
+from collections import deque
 
 global flow_count
 flow_count = 0
@@ -76,13 +77,17 @@ class valve_current(object):
         # See table 3 in the ADS1015/ADS1115 datasheet for more info on gain.
         self.GAIN = 1
 
+# this is a queue that keeps a list of the most recent measurements
+        self.current = deque(maxlen = 200)
+
+    def clear_queue(self):
+        self.current.clear()
         
     def calculate_milliamps(self, adc_value):
         adc_value_norm = adc_value - 2048
         return float((1000.0 * float(adc_value_norm)) / 89.95)
 
     def get_current(self):
-        self.current = 0.0
 
 ##        print('Reading ADS1x15 values, press Ctrl-C to quit...')
 ##        # Print nice channel column headers.
@@ -108,31 +113,28 @@ class valve_current(object):
         count = 0
         max = 0.0
         min = 0.0
-        while count < 50:
-            response = self.spi.readbytes(2)
-            #print response
-            lsb = response[1]
-            msb = response[0]
-            #print hex(msb)
-            #print hex(lsb)
-            pmod_value = (msb << 8) | lsb
-            ma = self.calculate_milliamps(pmod_value)
-#                print '(0b{:016b}'.format(pmod_value), ') ({:5.1f}'.format(ma), 'ma)'
-            time.sleep(0.1)
+#        while count < 50:
+        response = self.spi.readbytes(2)
+        #print response
+        lsb = response[1]
+        msb = response[0]
+        #print hex(msb)
+        #print hex(lsb)
+        pmod_value = (msb << 8) | lsb
+        ma = self.calculate_milliamps(pmod_value)
+        self.current.append(ma)
 
-            if ma > max:
-                max = ma
+# find the maximum value in the set of measurements
+        max_value=0
+        for i,value in enumerate(self.current):
+            if value>max_value:
+                max_value=value
+                index=i
+#        max_value = max(self.current_list) # this doesn't work returning the error "float object is not callable"
 
-            if ma < min:
-                min = ma
+#        print max_value
 
-            count +=1
-
-            if count == 50:
-#                print '{:5.1f}'.format(max), 'ma'
-                self.current = max
-
-        return self.current
+        return max_value
 
 ##########################
 class valve_power(object):
@@ -171,14 +173,16 @@ if __name__ == '__main__':
     valve_power_1 = valve_power(1, VALVE_1_POWER_GPIO)
 
     valve_current_1 = valve_current(1)
+    current = 0.0
 
     #############
     #### Start of Main Loop
     #############
     try:
         loop = 0
+        valve_current_1.clear_queue()
         while True:
-            time.sleep(0.5)
+            time.sleep(10)
             valve_status = valve_power_1.get_status()
             if (valve_status == 1):
                 flow = flow_sensor_1.get_rate()
@@ -187,6 +191,7 @@ if __name__ == '__main__':
                 loop = 0
             else:
                 if loop == 0:
+                    valve_current_1.clear_queue()
                     print "Waiting for valve to turn on"
                     loop = 1
 
