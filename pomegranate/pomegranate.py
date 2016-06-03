@@ -1,7 +1,9 @@
 #! /usr/bin/python
 """
-Created 3/22/16 by Greg Griffes based on the hackster.io rover pages at
-https://www.hackster.io/peejster/rover-c42139 
+Isavewater controller
+- measures water flow
+- measures valve current
+Created 6/03/16 by Greg Griffes  
 """
 import RPi.GPIO as GPIO
 import time, sys, os
@@ -11,13 +13,17 @@ import Adafruit_ADS1x15
 from collections import deque
 import threading
 import logging
+import datetime
 
 global flow_count
 flow_count = 0
 
-#logging.basicConfig(level=logging.DEBUG format='(%(threadName)-10s) %(message)s')
+# Provides a logging solution for troubleshooting
 logging.basicConfig(level=logging.DEBUG, format='(%(threadName)-10s) %(message)s')
 
+# -----------------------------------
+# setup the daemon that measures valve current
+# -----------------------------------
 # this is a queue that keeps a list of the most recent measurements
 currentq = deque(maxlen = 200)
 
@@ -36,11 +42,18 @@ def daemon_valve_1():
         ma = float((1000.0 * float(adc_value_norm)) / 89.95)
 #        logging.debug('Current(daemon) = {:5.1f}'.format(ma) + ' ma')
         currentq.append(ma)
+# this has to happen fairly quickly because the measurements vary wildly.
+# the most important measurement is the maximum positive value which corresponds
+# to the actual current measurement and appears about once every 50 - 100 measurements
         time.sleep(0.1)
 
+# create the thread and make it a daemon (doesn't block the main program calling it)
 measure_valve_current = threading.Thread(name='daemon_valve_1', target=daemon_valve_1)
 measure_valve_current.setDaemon(True)
 
+# -----------------------------------
+# setup the daemon that measures flow
+# -----------------------------------
 GPIO.setmode(GPIO.BCM)  # set GPIO to use BCM pin numbers
 GPIO.setwarnings(False) # warnings off
 
@@ -52,6 +65,10 @@ GPIO.setup(FLOW_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 # this is a queue that keeps a list of the most recent measurements
 flowq = deque(maxlen = 5)
 
+# this establishes a global variable that counts edges from the flow meter
+# when an edge occurs, it generates an interrupt that calls this function
+# Use it by setting the global variable to 0 then wait one second and look
+# at the count. That is ticks per second which can be converted to gallons per minute.
 flow_count = 0
 def flow_callback(gpio, level, tick):
     global flow_count
@@ -75,6 +92,7 @@ def daemon_flow_1():
 #        print flowq
 #        print ("flow count (daemon) = ", str(flow_count))
 
+# create the thread and make it a daemon (doesn't block the main program calling it)
 measure_flow_1 = threading.Thread(name='daemon_flow_1', target=daemon_flow_1)
 measure_flow_1.setDaemon(True)
 
@@ -87,10 +105,11 @@ class flow_sensor(object):
         self.flow = flow_queue
       
     def __del__(self):
-        cb.cancel() # Cancel callback.
-        pi.stop()   # Disconnect from Pi.
         print 'flow '+str(self.flow_zone)+' closed'
 
+    def clear_queue(self):
+        self.flow.clear()
+        
     def flow_calculator (self, freq):
         LPM2GPM = 0.264172  # Liters per minute to gallons per minute factor
     #    return (LPM2GPM*(freq/5.5))    # in GPM
@@ -116,6 +135,9 @@ class valve_current(object):
         self.valve_zone = valve_zone
         self.current = current_list
         
+    def __del__(self):
+        print 'valve current '+str(self.valve_zone)+' closed'
+
     def clear_queue(self):
         self.current.clear()
         
@@ -171,25 +193,36 @@ if __name__ == '__main__':
     #### Start of Main Loop
     #############
     try:
-        loop = 0
+        loop = 0    # used to determine the first time through each valve_status change
+        valves = [0, 1]
+        
+        # start the sensor daemons
         measure_flow_1.start()
-        measure_valve_current.start()   # this starts a background process that constantly takes valve current readings
-        print "Waiting for valve to turn on"
+        measure_valve_current.start()
+        
         while True:
-            time.sleep(10)
+            time.sleep(10)                      # let the queues fill with values
+
             valve_status = valve_power_1.get_status()
-            if (valve_status == 1):
-                flow = flow_sensor_1.get_rate()
-                current = valve_current_1.get_current()
-                print 'Flow rate = {:2.1f}'.format(flow), 'lpm and valve current = {:5.1f}'.format(current)+' ma'
+            if (valve_status == 1 and loop == 0):    #first time valve turns on
+                valve_current_1.clear_queue
+                flow_sensor_1.clear_queue
+                loop = 1
+            elif (valve_status == 0 and loop == 1):    #first time valve turns off
+                valve_current_1.clear_queue
+                flow_sensor_1.clear_queue
                 loop = 0
-            else:
-                if loop == 0:
-                    print "Waiting for valve to turn on"
-                    loop = 1
 
+            flow = flow_sensor_1.get_rate()
+            current = valve_current_1.get_current()
 
+            print 'V['+str(valves[0])+','+str(valve_status)+']:F[{:03.4f}'.format(flow)+']:C[{:05.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
+   
+###########################################################
+# END
+###########################################################
     except KeyboardInterrupt:
+        pi.stop()   # Disconnect from Pi.
         exit()
 
 #    except:
