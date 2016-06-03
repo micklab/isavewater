@@ -181,21 +181,41 @@ class valve_power(object):
 ###############################################################
 if __name__ == '__main__':
 
-    flow_sensor_1 = flow_sensor(1, flowq)
+    NUMBER_OF_VALVES = 2
+    VALVE_OFF = 0
+    VALVE_ON = 1
+    VALVE_POWER_GPIOS = [27, 17]     # GPIO pins assigned to valves
+    VALVE_CURRENT_SPI_ADDR = [0, 1]  # SPI addresses assigned to valve current meters
 
-    VALVE_1_POWER_GPIO = 27     # GPIO pin #
-    valve_power_1 = valve_power(1, VALVE_1_POWER_GPIO)
+    valves = []
+    valve_power_object = []
+    valve_current_object = []
 
-    valve_current_1 = valve_current(1, currentq)
-    current = 0.0
-
-    #############
-    #### Start of Main Loop
-    #############
-    try:
-        loop = 0    # used to determine the first time through each valve_status change
-        valves = [0, 1]
+    VALVE_NUMBER = 0
+    VALVE_STATUS = 1
+    VALVE_GPIO = 2
+    VALVE_SPI = 3
+    for v in range(NUMBER_OF_VALVES):
+        valves.append([v, VALVE_OFF, VALVE_POWER_GPIOS[v], VALVE_CURRENT_SPI_ADDR[v]])   # valve number, valve status, GPIO pin for valve status, SPI address for valve current
+    
+    logging.debug('valves[] = '+str(valves))
         
+    try:
+        
+        flow_sensor_1 = flow_sensor(1, flowq)
+
+        for v in range(NUMBER_OF_VALVES):
+            valve_power_object.append(valve_power(v, VALVE_POWER_GPIOS[v]))
+
+        valve_current_1 = valve_current(1, currentq)
+        current = 0.0
+
+        #############
+        #### Start of Main Loop
+        #############
+
+        loop = 0    # used to determine the first time through each valve_status change
+
         # start the sensor daemons
         measure_flow_1.start()
         measure_valve_current.start()
@@ -203,20 +223,21 @@ if __name__ == '__main__':
         while True:
             time.sleep(10)                      # let the queues fill with values
 
-            valve_status = valve_power_1.get_status()
-            if (valve_status == 1 and loop == 0):    #first time valve turns on
-                valve_current_1.clear_queue
-                flow_sensor_1.clear_queue
-                loop = 1
-            elif (valve_status == 0 and loop == 1):    #first time valve turns off
-                valve_current_1.clear_queue
-                flow_sensor_1.clear_queue
-                loop = 0
+            for v in range(NUMBER_OF_VALVES):
+                valve_status = valve_power_object[v].get_status()
+                if (valve_status == 1 and loop == 0):    #first time valve turns on
+                    valve_current_1.clear_queue
+                    flow_sensor_1.clear_queue
+                    loop = 1
+                elif (valve_status == 0 and loop == 1):    #first time valve turns off
+                    valve_current_1.clear_queue
+                    flow_sensor_1.clear_queue
+                    loop = 0
 
-            flow = flow_sensor_1.get_rate()
-            current = valve_current_1.get_current()
+                flow = flow_sensor_1.get_rate()
+                current = valve_current_1.get_current()
 
-            print 'V['+str(valves[0])+','+str(valve_status)+']:F[{:03.4f}'.format(flow)+']:C[{:05.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
+                print 'V['+str(v)+','+str(valve_status)+']:F[{:03.4f}'.format(flow)+']:C[{:05.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
    
 ###########################################################
 # END
