@@ -53,9 +53,19 @@ GPIO.setmode(GPIO.BCM)  # set GPIO to use BCM pin numbers
 GPIO.setwarnings(False) # warnings off
 
 # this daemon is a background process that runs continuously makes flow measurements
+
 # Constants
-FLOW_GPIO = 6               # GPIO pin #
+FLOW_GPIO = 19               # GPIO pin #
 GPIO.setup(FLOW_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+RELAY_PUMP_GPIO = 27        # GPIO pin #
+GPIO.setup(RELAY_PUMP_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+RELAY_VALVE_GPIO = 18        # GPIO pin #
+GPIO.setup(RELAY_VALVE_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+RELAY_X_GPIO = 22        # GPIO pin #
+GPIO.setup(RELAY_X_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+RELAY_Y_GPIO = 23        # GPIO pin #
+GPIO.setup(RELAY_Y_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # this is a queue that keeps a list of the most recent measurements
 flowq = deque(maxlen = 5)
@@ -159,7 +169,7 @@ class valve_power(object):
 
         print 'valve '+str(valve_zone)+' status GPIO # =  '+str(self.valve_gpio)
         
-        GPIO.setup(self.valve_gpio, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        GPIO.setup(self.valve_gpio, GPIO.IN)
       
 # Done with initialization
                     
@@ -178,7 +188,7 @@ if __name__ == '__main__':
     NUMBER_OF_VALVES = 2
     VALVE_OFF = 0
     VALVE_ON = 1
-    VALVE_POWER_GPIOS = [27, 17]     # GPIO pins assigned to valves
+    VALVE_POWER_GPIOS = [6, 5]     # GPIO pins assigned to valves
     VALVE_CURRENT_SPI_ADDR = [0, 1]  # SPI addresses assigned to valve current meters
 
     VALVE_CURRENT_QUEUE_SIZE = 200
@@ -236,11 +246,11 @@ if __name__ == '__main__':
 
             for v in range(NUMBER_OF_VALVES):
                 valve_status = valve_power_object[v].get_status()
-                if (valve_status == 1 and loop == 0):    #first time valve turns on
+                if (valve_status == 0 and loop == 0):    #first time valve turns on
                     valve_current_object[v].clear_queue
                     flow_sensor_1.clear_queue
                     loop = 1
-                elif (valve_status == 0 and loop == 1):    #first time valve turns off
+                elif (valve_status == 1 and loop == 1):    #first time valve turns off
                     valve_current_object[v].clear_queue
                     flow_sensor_1.clear_queue
                     loop = 0
