@@ -207,6 +207,7 @@ if __name__ == '__main__':
     try:
 # Init graphics        
         pygame.init()
+        FONT_VALUES = pygame.font.Font(None, 48)
         FONT_DESCRIPTION_HEAD = pygame.font.Font(None, 36)
         FONT_DESCRIPTION_BODY = pygame.font.Font(None, 24)
         pygame.display.set_caption('Internet of Things Project')
@@ -242,50 +243,51 @@ if __name__ == '__main__':
             valve_current_daemon.start()
         
 
-        loop = 0    # used to determine the first time through each valve_status change
-        current = 0.0
-
         # start the sensor daemons
         measure_flow_1.start()
         # start the valve daemons
+
+# graphics display
+        SCREEN_DIMENSIONS = [800, 800]  # setup window [0]= width [1]= height
+        event = pygame.event.poll()
+        if event.type == VIDEORESIZE:
+            xSize = event.dict['size'][0]
+            ySize = event.dict['size'][1]
+            SCREEN_DIMENSIONS = pygame.display.set_mode((xSize, ySize), HWSURFACE|DOUBLEBUF|RESIZABLE)
+        # initialize the location of the message area
+        SCREEN_DISPLAY = pygame.display.set_mode(SCREEN_DIMENSIONS)
+        # Description area
+        DESCRIPTION_AREA =  (0, 0, SCREEN_DIMENSIONS[0], SCREEN_DIMENSIONS[1])  # (left, top, width, height)
+        SCREEN_DISPLAY.fill(name_to_rgb('black'), DESCRIPTION_AREA)
+        # Header
+        DESCRIPTION_HEAD_XY =    (SCREEN_DIMENSIONS[0]/2, 25)   # centered
+        SCREEN_TEXT = FONT_DESCRIPTION_HEAD.render("Internet of Things Raspberry Pi Irrigation System", 1, name_to_rgb('white'))
+        txtpos = SCREEN_TEXT.get_rect()
+        txtpos.center = DESCRIPTION_HEAD_XY
+        SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+        # Body
+        DESCRIPTION_BODY_XY =    (SCREEN_DIMENSIONS[0]/2, 50)   # centered
+        SCREEN_TEXT = FONT_DESCRIPTION_BODY.render("Controls valves, detects Leaks, detects broken wires, cloud connected", 1, name_to_rgb('LightGreen'))
+        txtpos = SCREEN_TEXT.get_rect()
+        txtpos.center = DESCRIPTION_BODY_XY
+        SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+        # Header
+        DESCRIPTION_HEAD_XY =    (SCREEN_DIMENSIONS[0]/2, 100)   # centered
+        SCREEN_TEXT = FONT_DESCRIPTION_HEAD.render("DEMONSTRATION MODE", 1, name_to_rgb('LightGreen'))
+        txtpos = SCREEN_TEXT.get_rect()
+        txtpos.center = DESCRIPTION_HEAD_XY
+        SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+# update the screen
+        pygame.display.update()
 
         #############
         #### Start of Main Loop
         #############
 
-        while True:
-# graphics display
-            SCREEN_DIMENSIONS = [800, 800]  # setup window [0]= width [1]= height
-            event = pygame.event.poll()
-            if event.type == VIDEORESIZE:
-                xSize = event.dict['size'][0]
-                ySize = event.dict['size'][1]
-                SCREEN_DIMENSIONS = pygame.display.set_mode((xSize, ySize), HWSURFACE|DOUBLEBUF|RESIZABLE)
-            # initialize the location of the message area
-            SCREEN_DISPLAY = pygame.display.set_mode(SCREEN_DIMENSIONS)
-            DESCRIPTION_AREA =  (0, SCREEN_DIMENSIONS[0], 0, 140)  # full screen width
-            SCREEN_DISPLAY.fill(name_to_rgb('black'), DESCRIPTION_AREA)
-            # Header
-            DESCRIPTION_HEAD_XY =    (SCREEN_DIMENSIONS[0]/2, 25)   # centered
-            SCREEN_TEXT = FONT_DESCRIPTION_HEAD.render("Internet of Things Raspberry Pi Irrigation System", 1, name_to_rgb('white'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_HEAD_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-            # Body
-            DESCRIPTION_BODY_XY =    (SCREEN_DIMENSIONS[0]/2, 60)   # centered
-            SCREEN_TEXT = FONT_DESCRIPTION_BODY.render("Controls valves, detects Leaks, detects broken wires, cloud connected", 1, name_to_rgb('LightGreen'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_BODY_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-            # Header
-            DESCRIPTION_HEAD_XY =    (SCREEN_DIMENSIONS[0]/2, 100)   # centered
-            SCREEN_TEXT = FONT_DESCRIPTION_HEAD.render("DEMONSTRATION MODE", 1, name_to_rgb('LightGreen'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_HEAD_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-    # update the screen
-            pygame.display.update()
+        loop = 0    # used to determine the first time through each valve_status change
+        current = [0.0, 0.0]
 
+        while True:
             time.sleep(10)                      # let the queues fill with values
 
             for v in range(NUMBER_OF_VALVES):
@@ -300,9 +302,73 @@ if __name__ == '__main__':
                     loop = 0
 
                 flow = flow_sensor_1.get_rate()
-                current = valve_current_object[v].get_current()
+                current[v] = valve_current_object[v].get_current()
+                print 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current[v])+']:T['+str(datetime.datetime.now())+']'
 
-                print 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
+            DESCRIPTION_AREA =  (0, 200, SCREEN_DIMENSIONS[0], SCREEN_DIMENSIONS[1])  # (left, top, width, height)
+            SCREEN_DISPLAY.fill(name_to_rgb('black'), DESCRIPTION_AREA)
+            # Flow display
+            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 200)   # centered
+            SCREEN_TEXT = FONT_VALUES.render("Flow rate = %02.4f liters/minute"%flow, 1, name_to_rgb('LightSkyBlue'))
+            txtpos = SCREEN_TEXT.get_rect()
+            txtpos.center = DESCRIPTION_FLOW_XY
+            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 250)   # centered
+            if (flow < 1.0):
+                SCREEN_TEXT = FONT_VALUES.render("LOW FLOW - Possible blockage", 1, name_to_rgb('Red'))
+            elif (flow > 2.0):
+                SCREEN_TEXT = FONT_VALUES.render("HIGH FLOW - Possible leak", 1, name_to_rgb('Red'))
+            else:
+                SCREEN_TEXT = FONT_VALUES.render("Flow is nominal", 1, name_to_rgb('Green'))
+            txtpos = SCREEN_TEXT.get_rect()
+            txtpos.center = DESCRIPTION_FLOW_XY
+            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+                
+            # Pump display
+            if (valve_power_object[0].get_status() == 0):
+                PUMP_STATE = " ON"
+            else:
+                PUMP_STATE = "OFF"
+            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 400)   # centered
+            SCREEN_TEXT = FONT_VALUES.render("     Pump state: "+PUMP_STATE+" Current = %06.1f milliamps"%current[0], 1, name_to_rgb('LightSkyBlue'))
+            txtpos = SCREEN_TEXT.get_rect()
+            txtpos.center = DESCRIPTION_FLOW_XY
+            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 450)   # centered
+            if (current[0] < 100.0):
+                SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
+            elif (current[0] > 400.0):
+                SCREEN_TEXT = FONT_VALUES.render("HIGH CURRENT - Possible shorted wire or device", 1, name_to_rgb('Red'))
+            else:
+                SCREEN_TEXT = FONT_VALUES.render("Current is nominal", 1, name_to_rgb('Green'))
+            txtpos = SCREEN_TEXT.get_rect()
+            txtpos.center = DESCRIPTION_FLOW_XY
+            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+
+            # Sprinkler Valve display
+            if (valve_power_object[1].get_status() == 0):
+                PUMP_STATE = " ON"
+            else:
+                PUMP_STATE = "OFF"
+            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 600)   # centered
+            SCREEN_TEXT = FONT_VALUES.render("Sprinkler valve: "+PUMP_STATE+" Current = %06.1f milliamps"%current[1], 1, name_to_rgb('LightSkyBlue'))
+            txtpos = SCREEN_TEXT.get_rect()
+            txtpos.center = DESCRIPTION_FLOW_XY
+            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 650)   # centered
+            if (current[1] < 100.0):
+                SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
+            elif (current[1] > 400.0):
+                SCREEN_TEXT = FONT_VALUES.render("HIGH CURRENT - Possible shorted wire or device", 1, name_to_rgb('Red'))
+            else:
+                SCREEN_TEXT = FONT_VALUES.render("Current is nominal", 1, name_to_rgb('Green'))
+            txtpos = SCREEN_TEXT.get_rect()
+            txtpos.center = DESCRIPTION_FLOW_XY
+            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+
+    # update the screen
+            pygame.display.update()
+
    
 ###########################################################
 # END
