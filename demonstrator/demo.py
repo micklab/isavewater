@@ -64,14 +64,23 @@ GPIO.setwarnings(False) # warnings off
 FLOW_GPIO = 19               # GPIO pin #
 GPIO.setup(FLOW_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-RELAY_PUMP_GPIO = 27        # GPIO pin #
-GPIO.setup(RELAY_PUMP_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-RELAY_VALVE_GPIO = 18        # GPIO pin #
-GPIO.setup(RELAY_VALVE_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-RELAY_X_GPIO = 22        # GPIO pin #
-GPIO.setup(RELAY_X_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-RELAY_Y_GPIO = 23        # GPIO pin #
-GPIO.setup(RELAY_Y_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+VALVE_ON = 0
+VALVE_OFF = 1
+RELAY_PUMP_GPIO = 22        # GPIO pin #
+GPIO.setup(RELAY_PUMP_GPIO, GPIO.OUT)
+GPIO.output(RELAY_PUMP_GPIO, VALVE_OFF)
+
+RELAY_VALVE_GPIO = 23        # GPIO pin #
+GPIO.setup(RELAY_VALVE_GPIO, GPIO.OUT)
+GPIO.output(RELAY_VALVE_GPIO, VALVE_OFF)
+
+RELAY_X_GPIO = 18        # GPIO pin #
+GPIO.setup(RELAY_X_GPIO, GPIO.OUT)
+GPIO.output(RELAY_X_GPIO, VALVE_OFF)
+
+RELAY_Y_GPIO = 27        # GPIO pin #
+GPIO.setup(RELAY_Y_GPIO, GPIO.OUT)
+GPIO.output(RELAY_Y_GPIO, VALVE_OFF)
 
 # this is a queue that keeps a list of the most recent measurements
 flowq = deque(maxlen = 5)
@@ -286,97 +295,139 @@ if __name__ == '__main__':
 
         loop = 0    # used to determine the first time through each valve_status change
         current = [0.0, 0.0]
+        system = 0  # 0 = off
+        MAX_ELAPSED_TIME_ON = 20    # in seconds
+        MAX_ELAPSED_TIME_OFF = 10    # in seconds
+        
+        while True:         #Demo loop
 
-        while True:
-            time.sleep(10)                      # let the queues fill with values
-
-            for v in range(NUMBER_OF_VALVES):
-                valve_status = valve_power_object[v].get_status()
-                if (valve_status == 0 and loop == 0):    #first time valve turns on
-                    valve_current_object[v].clear_queue
-                    flow_sensor_1.clear_queue
-                    loop = 1
-                elif (valve_status == 1 and loop == 1):    #first time valve turns off
-                    valve_current_object[v].clear_queue
-                    flow_sensor_1.clear_queue
-                    loop = 0
-
-                flow = flow_sensor_1.get_rate()
-                current[v] = valve_current_object[v].get_current()
-                print 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current[v])+']:T['+str(datetime.datetime.now())+']'
-
-            DESCRIPTION_AREA =  (0, 200, SCREEN_DIMENSIONS[0], SCREEN_DIMENSIONS[1])  # (left, top, width, height)
-            SCREEN_DISPLAY.fill(name_to_rgb('black'), DESCRIPTION_AREA)
-            # Flow display
-            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 200)   # centered
-            SCREEN_TEXT = FONT_VALUES.render("Flow rate = %02.4f liters/minute"%flow, 1, name_to_rgb('LightSkyBlue'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_FLOW_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 250)   # centered
-            if (flow < 1.0):
-                SCREEN_TEXT = FONT_VALUES.render("LOW FLOW - Possible blockage", 1, name_to_rgb('Red'))
-            elif (flow > 2.0):
-                SCREEN_TEXT = FONT_VALUES.render("HIGH FLOW - Possible leak", 1, name_to_rgb('Red'))
+            if (system == 0):
+                GPIO.output(RELAY_VALVE_GPIO, VALVE_ON)
+                GPIO.output(RELAY_PUMP_GPIO, VALVE_ON)
+                # work out elapsed time                                                       
+                system = 1
             else:
-                SCREEN_TEXT = FONT_VALUES.render("Flow is nominal", 1, name_to_rgb('Green'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_FLOW_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+                GPIO.output(RELAY_VALVE_GPIO, VALVE_OFF)
+                GPIO.output(RELAY_PUMP_GPIO, VALVE_OFF)
+                # work out elapsed time                                                       
+                system = 0
                 
-            # Pump display
-            if (valve_power_object[0].get_status() == 0):
-                PUMP_STATE = " ON"
-            else:
-                PUMP_STATE = "OFF"
-            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 400)   # centered
-            SCREEN_TEXT = FONT_VALUES.render("     Pump state: "+PUMP_STATE+" Current = %06.1f milliamps"%current[0], 1, name_to_rgb('LightSkyBlue'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_FLOW_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 450)   # centered
-            if (current[0] < 100.0):
-                SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
-            elif (current[0] > 400.0):
-                SCREEN_TEXT = FONT_VALUES.render("HIGH CURRENT - Possible shorted wire or device", 1, name_to_rgb('Red'))
-            else:
-                SCREEN_TEXT = FONT_VALUES.render("Current is nominal", 1, name_to_rgb('Green'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_FLOW_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+            # note start time
+            start_time = time.time()                                                        
+            # note end time
+            end_time = time.time()
+            elapsed_time = (end_time - start_time)
 
-            # Sprinkler Valve display
-            if (valve_power_object[1].get_status() == 0):
-                PUMP_STATE = " ON"
-            else:
-                PUMP_STATE = "OFF"
-            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 600)   # centered
-            SCREEN_TEXT = FONT_VALUES.render("Sprinkler valve: "+PUMP_STATE+" Current = %06.1f milliamps"%current[1], 1, name_to_rgb('LightSkyBlue'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_FLOW_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-            DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 650)   # centered
-            if (current[1] < 100.0):
-                SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
-            elif (current[1] > 400.0):
-                SCREEN_TEXT = FONT_VALUES.render("HIGH CURRENT - Possible shorted wire or device", 1, name_to_rgb('Red'))
-            else:
-                SCREEN_TEXT = FONT_VALUES.render("Current is nominal", 1, name_to_rgb('Green'))
-            txtpos = SCREEN_TEXT.get_rect()
-            txtpos.center = DESCRIPTION_FLOW_XY
-            SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+            while ((system == 0 and elapsed_time < MAX_ELAPSED_TIME_ON) or (system == 1 and elapsed_time < MAX_ELAPSED_TIME_OFF)):     # Measure loop
+                time.sleep(3)                      # let the queues fill with values
 
-    # update the screen
-            pygame.display.update()
+                for v in range(NUMBER_OF_VALVES):
+                    valve_status = valve_power_object[v].get_status()
+                    if (valve_status == 0 and loop == 0):    #first time valve turns on
+                        valve_current_object[v].clear_queue
+                        flow_sensor_1.clear_queue
+                        loop = 1
+                    elif (valve_status == 1 and loop == 1):    #first time valve turns off
+                        valve_current_object[v].clear_queue
+                        flow_sensor_1.clear_queue
+                        loop = 0
 
+                    flow = flow_sensor_1.get_rate()
+                    current[v] = valve_current_object[v].get_current()
+                    print 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current[v])+']:T['+str(datetime.datetime.now())+']'
+
+                DESCRIPTION_AREA =  (0, 140, SCREEN_DIMENSIONS[0], SCREEN_DIMENSIONS[1])  # (left, top, width, height)
+                SCREEN_DISPLAY.fill(name_to_rgb('black'), DESCRIPTION_AREA)
+
+                # Sprinkler Valve display
+                if (valve_power_object[0].get_status() == 0):
+                    SPRINKLER_STATE = " ON"
+                else:
+                    SPRINKLER_STATE = "OFF"
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 600)   # centered
+                SCREEN_TEXT = FONT_VALUES.render("Sprinkler valve: "+SPRINKLER_STATE+" Current = %06.1f milliamps"%current[0], 1, name_to_rgb('LightSkyBlue'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 650)   # centered
+                if (current[0] < 200.0):
+                    SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
+                elif (current[0] > 400.0):
+                    SCREEN_TEXT = FONT_VALUES.render("HIGH CURRENT - Possible shorted wire or device", 1, name_to_rgb('Red'))
+                else:
+                    SCREEN_TEXT = FONT_VALUES.render("Current is nominal", 1, name_to_rgb('Green'))
+                if (SPRINKLER_STATE == "OFF"):
+                    SCREEN_TEXT = FONT_VALUES.render("Sprinkler valve is off", 1, name_to_rgb('Gray'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+
+                # Flow display
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 200)   # centered
+                SCREEN_TEXT = FONT_VALUES.render("Flow rate = %02.4f liters/minute"%flow, 1, name_to_rgb('LightSkyBlue'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 250)   # centered
+                if (flow < 1.0):
+                    SCREEN_TEXT = FONT_VALUES.render("LOW FLOW - Possible blockage", 1, name_to_rgb('Red'))
+                elif (flow > 2.0):
+                    SCREEN_TEXT = FONT_VALUES.render("HIGH FLOW - Possible leak", 1, name_to_rgb('Red'))
+                else:
+                    SCREEN_TEXT = FONT_VALUES.render("Flow is nominal", 1, name_to_rgb('Green'))
+                if (SPRINKLER_STATE == "OFF"):
+                    SCREEN_TEXT = FONT_VALUES.render("Sprinkler valve is off", 1, name_to_rgb('Gray'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+                    
+                # Pump display
+                if (valve_power_object[1].get_status() == 0):
+                    PUMP_STATE = " ON"
+                else:
+                    PUMP_STATE = "OFF"
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 400)   # centered
+                SCREEN_TEXT = FONT_VALUES.render("     Pump state: "+PUMP_STATE+" Current = %06.1f milliamps"%current[1], 1, name_to_rgb('LightSkyBlue'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 450)   # centered
+                if (current[1] < 1000.0):
+                    SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
+                elif (current[1] > 1500.0):
+                    SCREEN_TEXT = FONT_VALUES.render("HIGH CURRENT - Possible shorted wire or device", 1, name_to_rgb('Red'))
+                else:
+                    SCREEN_TEXT = FONT_VALUES.render("Current is nominal", 1, name_to_rgb('Green'))
+                if (PUMP_STATE == "OFF"):
+                    SCREEN_TEXT = FONT_VALUES.render("Pump is off", 1, name_to_rgb('Gray'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+
+        # update the screen
+                pygame.display.update()
+
+                # note end time
+                end_time = time.time()
+                # work out elapsed time                                                       
+                elapsed_time = (end_time - start_time)
+                print ("Elapsed time = "+str(elapsed_time))
    
 ###########################################################
 # END
 ###########################################################
     except KeyboardInterrupt:
+        GPIO.output(RELAY_VALVE_GPIO, VALVE_ON)
+        GPIO.output(RELAY_PUMP_GPIO, VALVE_ON)
+        GPIO.output(RELAY_X_GPIO, VALVE_ON)
+        GPIO.output(RELAY_Y_GPIO, VALVE_ON)
         pi.stop()   # Disconnect from Pi.
         exit()
 
-#    except:
+    except:
+        GPIO.output(RELAY_VALVE_GPIO, VALVE_ON)
+        GPIO.output(RELAY_PUMP_GPIO, VALVE_ON)
+        GPIO.output(RELAY_X_GPIO, VALVE_ON)
+        GPIO.output(RELAY_Y_GPIO, VALVE_ON)
 
     # normal exit
