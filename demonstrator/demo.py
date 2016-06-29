@@ -64,6 +64,13 @@ GPIO.setwarnings(False) # warnings off
 FLOW_GPIO = 19               # GPIO pin #
 GPIO.setup(FLOW_GPIO, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
+FLOW_NOMINAL = 1.5      #LPM
+FLOW_TOLERANCE = 30.0   # %
+PUMP_NOMINAL = 1200.0   #ma
+PUMP_TOLERANCE = 30.0   # %
+VALVE_NOMINAL = 200.0   #ma
+VALVE_TOLERANCE = 30.0   # %
+
 VALVE_ON = 0
 VALVE_OFF = 1
 RELAY_PUMP_GPIO = 22        # GPIO pin #
@@ -83,7 +90,7 @@ GPIO.setup(RELAY_Y_GPIO, GPIO.OUT)
 GPIO.output(RELAY_Y_GPIO, VALVE_OFF)
 
 # this is a queue that keeps a list of the most recent measurements
-flowq = deque(maxlen = 5)
+flowq = deque(maxlen = 1)
 
 # this establishes a global variable that counts edges from the flow meter
 # when an edge occurs, it generates an interrupt that calls this function
@@ -128,7 +135,12 @@ class flow_sensor(object):
         print 'flow '+str(self.flow_zone)+' closed'
 
     def clear_queue(self):
-        self.flow.clear()
+        None
+#        self.flow.clear()
+##        for i,value in enumerate(self.flow):
+##            if value>FLOW_NOMINAL:
+##                remove(value)
+##                index=i
         
     def flow_calculator (self, freq):
         LPM2GPM = 0.264172  # Liters per minute to gallons per minute factor
@@ -158,7 +170,12 @@ class valve_current(object):
         print 'valve current '+str(self.valve_zone)+' closed'
 
     def clear_queue(self):
-        self.current.clear()
+        None
+#        current_queue.clear()
+##        for i,value in enumerate(current_queue):
+##            if value>VALVE_NOMINAL:
+##                remove(value)
+##                index=i
         
     def get_current(self):
 
@@ -206,7 +223,7 @@ if __name__ == '__main__':
     VALVE_POWER_GPIOS = [6, 5]     # GPIO pins assigned to valves
     VALVE_CURRENT_SPI_ADDR = [0, 1]  # SPI addresses assigned to valve current meters
 
-    VALVE_CURRENT_QUEUE_SIZE = 200
+    VALVE_CURRENT_QUEUE_SIZE = 50
 
     VALVE_NUMBER = 0
     VALVE_STATUS = 1
@@ -324,10 +341,12 @@ if __name__ == '__main__':
                 for v in range(NUMBER_OF_VALVES):
                     valve_status = valve_power_object[v].get_status()
                     if (valve_status == 0 and loop == 0):    #first time valve turns on
+                        print "clearing queue "+str(v)
                         valve_current_object[v].clear_queue
                         flow_sensor_1.clear_queue
                         loop = 1
                     elif (valve_status == 1 and loop == 1):    #first time valve turns off
+                        print "clearing queue "+str(v)
                         valve_current_object[v].clear_queue
                         flow_sensor_1.clear_queue
                         loop = 0
@@ -339,17 +358,27 @@ if __name__ == '__main__':
                 DESCRIPTION_AREA =  (0, 140, SCREEN_DIMENSIONS[0], SCREEN_DIMENSIONS[1])  # (left, top, width, height)
                 SCREEN_DISPLAY.fill(name_to_rgb('black'), DESCRIPTION_AREA)
 
+                # Timer display
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 200)   # centered
+                if (system == 0):
+                    SCREEN_TEXT = FONT_VALUES.render("System OFF in %02.1f seconds"%(MAX_ELAPSED_TIME_ON-elapsed_time), 1, name_to_rgb('Gold'))
+                else:
+                    SCREEN_TEXT = FONT_VALUES.render("System ON in %02.1f seconds"%(MAX_ELAPSED_TIME_OFF-elapsed_time), 1, name_to_rgb('Gold'))
+                txtpos = SCREEN_TEXT.get_rect()
+                txtpos.center = DESCRIPTION_FLOW_XY
+                SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
+
                 # Sprinkler Valve display
                 if (valve_power_object[0].get_status() == 0):
                     SPRINKLER_STATE = " ON"
                 else:
                     SPRINKLER_STATE = "OFF"
-                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 600)   # centered
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 500)   # centered
                 SCREEN_TEXT = FONT_VALUES.render("Sprinkler valve: "+SPRINKLER_STATE+" Current = %06.1f milliamps"%current[0], 1, name_to_rgb('LightSkyBlue'))
                 txtpos = SCREEN_TEXT.get_rect()
                 txtpos.center = DESCRIPTION_FLOW_XY
                 SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 650)   # centered
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 530)   # centered
                 if (current[0] < 200.0):
                     SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
                 elif (current[0] > 400.0):
@@ -363,12 +392,12 @@ if __name__ == '__main__':
                 SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
 
                 # Flow display
-                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 200)   # centered
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 300)   # centered
                 SCREEN_TEXT = FONT_VALUES.render("Flow rate = %02.4f liters/minute"%flow, 1, name_to_rgb('LightSkyBlue'))
                 txtpos = SCREEN_TEXT.get_rect()
                 txtpos.center = DESCRIPTION_FLOW_XY
                 SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 250)   # centered
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 330)   # centered
                 if (flow < 1.0):
                     SCREEN_TEXT = FONT_VALUES.render("LOW FLOW - Possible blockage", 1, name_to_rgb('Red'))
                 elif (flow > 2.0):
@@ -391,7 +420,7 @@ if __name__ == '__main__':
                 txtpos = SCREEN_TEXT.get_rect()
                 txtpos.center = DESCRIPTION_FLOW_XY
                 SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
-                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 450)   # centered
+                DESCRIPTION_FLOW_XY =    (SCREEN_DIMENSIONS[0]/2, 430)   # centered
                 if (current[1] < 1000.0):
                     SCREEN_TEXT = FONT_VALUES.render("LOW CURRENT - Possible broken wire", 1, name_to_rgb('Red'))
                 elif (current[1] > 1500.0):
