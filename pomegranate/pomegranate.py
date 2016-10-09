@@ -15,6 +15,22 @@ import threading
 import logging
 import datetime
 
+##from flask import Flask
+
+import socket
+#create an AF_INET, STREAM socket (TCP)
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#Connect to remote server
+remote_ip = '127.0.0.1'
+port = 5005
+socket_ok = True
+try:
+    s.connect((remote_ip , port))
+except socket.error:
+    #could not resolve
+    print '!! ERROR !! Remote IP '+ remote_ip + ' and port ' + str(port) + ' could not be connected.'
+    socket_ok = False
+
 global flow_count
 flow_count = 0
 
@@ -180,6 +196,13 @@ class valve_power(object):
         return GPIO.input(self.valve_gpio)
 
 
+# initialize the web server
+##webserver = Flask(__name__)
+##webserver.route('/')
+##def index():
+##    return 'Hello World'
+        
+
 ###############################################################
 # Main program
 ###############################################################
@@ -199,7 +222,7 @@ if __name__ == '__main__':
     VALVE_SPI = 3
     
     try:
-        
+          
         flow_sensor_1 = flow_sensor(1, flowq)
 
         # create the data structures
@@ -235,7 +258,9 @@ if __name__ == '__main__':
 
         # start the sensor daemons
         measure_flow_1.start()
-        # start the valve daemons
+
+        # start the web server
+##        webserver.run(debug=True, host='0.0.0.0')
 
         #############
         #### Start of Main Loop
@@ -258,8 +283,16 @@ if __name__ == '__main__':
                 flow = flow_sensor_1.get_rate()
                 current = valve_current_object[v].get_current()
 
-                print 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
-   
+                message = 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
+                print message
+
+                try :
+                    #Set the whole string
+                    s.sendall(message)
+                except socket.error:
+                    #Send failed
+                    print 'Socket send failed'
+    
 ###########################################################
 # END
 ###########################################################
