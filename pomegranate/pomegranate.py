@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.DEBUG, format='(%(threadName)-10s) %(message)s
 # this daemon is a background process that runs continuously makes current measurements
 # and fills the queue with current measurements. 
 def daemon_valve(valve_number, spi_addr):
-    logging.debug('daemon valve # '+str(valve_number)+' running: spi='+str(spi_addr))
+#    logging.debug('daemon valve # '+str(valve_number)+' running: spi='+str(spi_addr))
     spi = spidev.SpiDev()
     spi.open(0,spi_addr)
     x = 1
@@ -43,7 +43,7 @@ def daemon_valve(valve_number, spi_addr):
     # this has to happen fairly quickly because the measurements vary wildly.
     # the most important measurement is the maximum positive value which corresponds
     # to the actual current measurement and appears about once every 50 - 100 measurements
-        time.sleep(0.1)
+        time.sleep(0.005)
 #        logging.debug(current_queue[valve_number])
 
 # -----------------------------------
@@ -185,7 +185,7 @@ class valve_power(object):
 ###############################################################
 if __name__ == '__main__':
 
-    NUMBER_OF_VALVES = 2
+    NUMBER_OF_VALVES = 1
     VALVE_OFF = 0
     VALVE_ON = 1
     VALVE_POWER_GPIOS = [6, 5]     # GPIO pins assigned to valves
