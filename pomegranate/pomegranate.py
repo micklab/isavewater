@@ -16,18 +16,19 @@ import logging
 import datetime
 import io
 import warnings
+import copy
 warnings.filterwarnings('error', category=DeprecationWarning)
 
-from picamera import PiCamera
-camera = PiCamera()
-camera.resolution = (1280, 720)
-camera.framerate = 24
-camera.start_preview()
-camera.preview.fullscreen = True
-camera.preview.alpha = 128
-time.sleep(2)
-stream = io.BytesIO()
-camera.capture(stream, 'yuv', use_video_port=True)
+##from picamera import PiCamera
+##camera = PiCamera()
+##camera.resolution = (1280, 720)
+##camera.framerate = 24
+##camera.start_preview()
+##camera.preview.fullscreen = True
+##camera.preview.alpha = 128
+##time.sleep(2)
+##stream = io.BytesIO()
+#camera.capture(stream, 'yuv', use_video_port=True)
     
 ##from flask import Flask
 
@@ -178,12 +179,14 @@ class valve_current(object):
     def get_current(self):
 
 # find the maximum value in the set of measurements
-        max_value=-6000.0
-        for i,value in enumerate(current_queue[self.valve_zone]):
-            if value>max_value:
-                max_value=value
-                index=i
-#        max_value = max(self.current_list) # this doesn't work returning the error "float object is not callable"
+##        max_value=-6000.0
+##        tempQueue = []
+##        tempQueue = copy.deepcopy(current_queue)
+##        for i,value in enumerate(tempQueue[self.valve_zone]):
+##            if value>max_value:
+##                max_value=value
+##                index=i
+        max_value = max(current_queue[self.valve_zone])
 
 #        print current_queue[self.valve_zone]
 
@@ -236,7 +239,7 @@ if __name__ == '__main__':
     VALVE_SPI = 3
     
     try:
-        camera.start_preview()
+##        camera.start_preview()
         
         flow_sensor_1 = flow_sensor(1, flowq)
 
@@ -282,7 +285,7 @@ if __name__ == '__main__':
         #############
 
         while True:
-            time.sleep(10)                      # let the queues fill with values
+            time.sleep(0.3)                      # let the queues fill with values
 
             for v in range(NUMBER_OF_VALVES):
                 valve_status = valve_power_object[v].get_status()
@@ -299,7 +302,9 @@ if __name__ == '__main__':
                 current = valve_current_object[v].get_current()
 
                 message = 'V['+str(v)+','+str(valve_status)+']:F[{:4.4f}'.format(flow)+']:C[{:7.1f}'.format(current)+']:T['+str(datetime.datetime.now())+']'
-                print message
+                jsonMessage = '[{ "valve_number": '+ str(v) +', "valve_status": ' + str(valve_status) + ', "flow_rate": ' + '{:4.4f}'.format(flow) + ', "current": ' + '{:7.1f}'.format(current) + '}]'
+                print jsonMessage
+                #print message
 
                 try :
                     #Set the whole string
