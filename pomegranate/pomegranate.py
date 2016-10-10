@@ -14,7 +14,21 @@ from collections import deque
 import threading
 import logging
 import datetime
+import io
+import warnings
+warnings.filterwarnings('error', category=DeprecationWarning)
 
+from picamera import PiCamera
+camera = PiCamera()
+camera.resolution = (1280, 720)
+camera.framerate = 24
+camera.start_preview()
+camera.preview.fullscreen = True
+camera.preview.alpha = 128
+time.sleep(2)
+stream = io.BytesIO()
+camera.capture(stream, 'yuv', use_video_port=True)
+    
 ##from flask import Flask
 
 import socket
@@ -222,7 +236,8 @@ if __name__ == '__main__':
     VALVE_SPI = 3
     
     try:
-          
+        camera.start_preview()
+        
         flow_sensor_1 = flow_sensor(1, flowq)
 
         # create the data structures
