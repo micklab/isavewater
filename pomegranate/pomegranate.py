@@ -308,7 +308,7 @@ if __name__ == '__main__':
 
                 try :
                     #Set the whole string
-                    s.sendall(message)
+                    s.sendall(jsonMessage)
                 except socket.error:
                     #Send failed
                     print 'Socket send failed'

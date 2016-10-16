@@ -14,6 +14,7 @@ from collections import deque
 import threading
 import logging
 import datetime
+from picamera import PiCamera
 
 # for graphics
 from webcolors import name_to_rgb
@@ -23,6 +24,8 @@ from pygame.locals import *
 # Global variables
 global flow_count
 flow_count = 0
+
+#camera = PiCamera()
 
 # Provides a logging solution for troubleshooting
 logging.basicConfig(level=logging.DEBUG, format='(%(threadName)-10s) %(message)s')
@@ -305,6 +308,8 @@ if __name__ == '__main__':
         SCREEN_DISPLAY.blit(SCREEN_TEXT, txtpos)
 # update the screen
         pygame.display.update()
+
+        #camera.start_preview()
 
         #############
         #### Start of Main Loop
